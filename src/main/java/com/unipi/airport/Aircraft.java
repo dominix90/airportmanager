@@ -47,16 +47,23 @@ public class Aircraft extends AbstractActor {
 		.match(
 	        StartLanding.class,
             r -> {
-            	this.remainingTime = r.getFuel();
+            	this.remainingTime = r.fuel;
             	getSender()
             		.tell(new LandingRequest("00000001", flightId), getSelf());
             	log.info("Landing request by aircraft {} to control tower", this.flightId);
             })
         .match(
-        	RespondTime.class,
+    		RespondLandingTime.class,
             r -> {
             	getSender()
-            		.tell(new LandingConfirmation(r.getRequestId(), sufficientFuel(r.getTimeForLanding()), flightId), getSelf());
+            		.tell(new LandingConfirmation(sufficientFuel(r.timeForLanding), flightId), getSelf());
+      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            })
+        .match(
+    		UpdateLandingTime.class,
+            r -> {
+            	getSender()
+            		.tell(new LandingConfirmation(sufficientFuel(r.timeForLanding), flightId), getSelf());
       			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
             })
         .build();
