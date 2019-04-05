@@ -13,19 +13,21 @@ public class ControlTower extends AbstractActor {
 
 	/* ========== VARIABILI E STRUTTURE DATI ========== */	
 	private final String airportId; //id aeroporto
-	private Deque<ActorRef> landingQueue;
-	private Deque<ActorRef> departureQueue;
+	private Runway[] runways;
+	private Deque<Aircraft> landingQueue;
+	private Deque<Aircraft> departureQueue;
 	
 	/* ========== COSTRUTTORE E METODI NATIVI ========== */	
 
-	public ControlTower(String airportId) {
+	public ControlTower(String airportId, Runway[] runways) {
 	    this.airportId = airportId;
-	    this.landingQueue = new LinkedList<ActorRef>();
-	    this.departureQueue = new LinkedList<ActorRef>();
+	    this.runways = runways;
+	    this.landingQueue = new LinkedList<Aircraft>();
+	    this.departureQueue = new LinkedList<Aircraft>();
 	}
 
-	public static Props props(String airportId) {
-	    return Props.create(ControlTower.class, () -> new ControlTower(airportId));
+	public static Props props(String airportId, Runway[] runways) {
+	    return Props.create(ControlTower.class, () -> new ControlTower(airportId, runways));
 	}
 	  
 	@Override
@@ -46,7 +48,7 @@ public class ControlTower extends AbstractActor {
 		  
 		int queueSize = landingQueue.size();
 		if (queueSize != 0)
-			time = Parameters.averageRunwayOccupation * queueSize / Parameters.runwaysNumber;
+			time = Parameters.averageRunwayOccupation * queueSize / runways.length;
 		  
 		return time;
 	}
@@ -65,11 +67,34 @@ public class ControlTower extends AbstractActor {
 	/* Aggiornamento dei tempi in caso di atterraggio d'emergenza */
 	private void informAircrafts () {
 		int i = 0;
-		for (ActorRef a : landingQueue) {
+		for (Aircraft a : landingQueue) {
 			if (i == 0)
-				a.tell(new UpdateLandingTime(Parameters.averageRunwayOccupation), getSelf());
+				a.getAircraftActor().tell(new UpdateLandingTime(Parameters.averageRunwayOccupation), getSelf());
 			else
-				a.tell(new UpdateLandingTime(Parameters.averageRunwayOccupation * i / Parameters.runwaysNumber), getSelf());
+				a.getAircraftActor().tell(new UpdateLandingTime(Parameters.averageRunwayOccupation * i / runways.length), getSelf());
+			i++;
+		}
+	}
+	
+	/* ========== METODI GESTIONE PISTE ========== */	
+	private Runway getFreeRunway() {
+		for (int i = 0; i < runways.length; i++) {
+			if (runways[i].isFree())
+				return runways[i];
+		}
+		return null;
+	}
+	
+	/* ========== METODI VISUALIZZAZIONE STATO AEROPORTO ========== */	
+	
+	/* Metodo per visualizzare la coda di atterraggio */
+	private void printLandingQueue() {
+		if (landingQueue.size() <= 0) {
+			log.info("Nessun aereo si trova in coda di atterraggio");
+		}
+		int i = 0;
+		for (Aircraft a : landingQueue) {
+			log.info("Posizione {}: {}", Integer.toString(i+1), a.getFlightId());
 			i++;
 		}
 	}
@@ -98,7 +123,7 @@ public class ControlTower extends AbstractActor {
 	            r -> {
 	            	if(r.value) {
 	            		log.info("Aircraft {} accepted to land", r.flightId);
-	            		landingQueue.addFirst(getSender());
+	            		landingQueue.addFirst(new Aircraft(r.flightId,getSender()));
 	            		informAircrafts();
 	            	}
 	            	else
@@ -109,12 +134,12 @@ public class ControlTower extends AbstractActor {
 	            r -> {
 	            	if(r.value) {
 	            		log.info("Aircraft {} accepted to land", r.flightId);
-	            		landingQueue.add(getSender());
+	            		landingQueue.addFirst(new Aircraft(r.flightId,getSender()));
+	            		printLandingQueue();
 	            	}
 	            	else
 	            		log.info("Aircraft {} changed course. It is now directed to another airport", r.flightId);
 	            })
-	        .build();
-	    
+	        .build();	    
 	  }
 }

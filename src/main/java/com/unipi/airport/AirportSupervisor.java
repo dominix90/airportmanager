@@ -7,6 +7,7 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 
 import com.unipi.utils.Messages.*;
+import com.unipi.utils.Parameters;
 
 public class AirportSupervisor extends AbstractActor {
 	
@@ -16,13 +17,20 @@ public class AirportSupervisor extends AbstractActor {
 		return Props.create(AirportSupervisor.class);
 	}
 	
-	ActorRef aircraft1 = getContext().actorOf(Aircraft.props("FR0001"));
-	ActorRef aircraft2 = getContext().actorOf(Aircraft.props("VY9999"));
-    ActorRef controlTower = getContext().actorOf(ControlTower.props("CTA"));
+	//AEREI
+	ActorRef aircraft1 = getContext().actorOf(AircraftActor.props("FR0001"));
+	ActorRef aircraft2 = getContext().actorOf(AircraftActor.props("VY9999"));
+	
 
 	@Override
 	public void preStart() {
 		log.info("Airport Application started");
+		//PISTE E AEROPORTO
+		Runway[] runways = new Runway[Parameters.runwaysNumber];
+		for (int i = 0; i < Parameters.runwaysNumber; i++) {
+			runways[i] = new Runway("FREE");
+		}
+	    ActorRef controlTower = getContext().actorOf(ControlTower.props("CTA",runways));
 		aircraft1.tell(new StartLanding(controlTower, 150), controlTower);
 		aircraft2.tell(new StartLanding(controlTower, 75), controlTower);
 	}
