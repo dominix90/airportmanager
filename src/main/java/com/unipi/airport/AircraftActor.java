@@ -1,9 +1,10 @@
 package com.unipi.airport;
 
-import akka.actor.AbstractActor;
-import akka.actor.Props;
+import akka.actor.*;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+
+import java.time.Duration;
 
 import com.unipi.utils.Messages.*;
 
@@ -12,6 +13,7 @@ public class AircraftActor extends AbstractActor {
 
   private final String flightId;
   private long remainingTime = 150;
+  private Scheduler scheduler = getContext().getSystem().getScheduler();
 
   public AircraftActor(String flightId) {
     this.flightId = flightId;
@@ -45,7 +47,7 @@ public class AircraftActor extends AbstractActor {
   public Receive createReceive() {
     return receiveBuilder()
 		.match(
-	        StartLanding.class,
+			StartLandingPhase.class,
             r -> {
             	this.remainingTime = r.fuel;
             	getSender()
@@ -55,17 +57,42 @@ public class AircraftActor extends AbstractActor {
         .match(
     		RespondLandingTime.class,
             r -> {
-            	getSender()
-            		.tell(new LandingConfirmation(sufficientFuel(r.timeForLanding), flightId), getSelf());
-      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            	if (this.flightId.equals(r.flightId)) {
+            		boolean landingConfirmation = sufficientFuel(r.timeForLanding);
+	            	getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 1), getSelf());
+	      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+	      			if (!landingConfirmation)
+	      				getContext().stop(getSelf());
+            	}
             })
         .match(
     		UpdateLandingTime.class,
             r -> {
-            	getSender()
-            		.tell(new LandingConfirmation(sufficientFuel(r.timeForLanding), flightId), getSelf());
-      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            	if (this.flightId.equals(r.flightId)) {
+            		boolean landingConfirmation = sufficientFuel(r.timeForLanding);
+	            	getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 2), getSelf());
+	            	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
+	            	if (!landingConfirmation)
+	      				getContext().stop(getSelf());
+            	}
             })
+        .match(
+    		StartLanding.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		getSender().tell(new Landing(r.runway, r.flightId), getSelf());
+	            	log.info("Aircraft {} started landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
+	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new InLandingState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
+            	}
+            })
+        .match(
+        	InLandingState.class,
+                r -> {
+                	if (this.flightId.equals(r.flightId)) {
+                		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
+    	            	log.info("Aircraft {} completed landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
+                	}
+                })
         .build();
   }
 }

@@ -28,11 +28,11 @@ public class AirportSupervisor extends AbstractActor {
 		//PISTE E AEROPORTO
 		Runway[] runways = new Runway[Parameters.runwaysNumber];
 		for (int i = 0; i < Parameters.runwaysNumber; i++) {
-			runways[i] = new Runway("FREE");
+			runways[i] = new Runway(i+1, "FREE");
 		}
 	    ActorRef controlTower = getContext().actorOf(ControlTower.props("CTA",runways));
-		aircraft1.tell(new StartLanding(controlTower, 150), controlTower);
-		aircraft2.tell(new StartLanding(controlTower, 75), controlTower);
+		aircraft1.tell(new StartLandingPhase(controlTower, 150), controlTower);
+		aircraft2.tell(new StartLandingPhase(controlTower, 75), controlTower);
 	}
 
 	@Override
