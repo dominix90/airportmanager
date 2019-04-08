@@ -16,8 +16,8 @@ public class ControlTower extends AbstractActor {
 	private Runway[] runways;
 	private Deque<Aircraft> landingQueue;
 	private Deque<Aircraft> departureQueue;
-	private Map<Integer, Aircraft> parking;
-	private Map<Integer, Aircraft> emergencyParking;
+	private Aircraft[] parking;
+	private Aircraft[] emergencyParking;
 	
 	/* ========== COSTRUTTORE E METODI NATIVI ========== */	
 
@@ -26,8 +26,8 @@ public class ControlTower extends AbstractActor {
 	    this.runways = runways;
 	    this.landingQueue = new LinkedList<Aircraft>();
 	    this.departureQueue = new LinkedList<Aircraft>();
-	    this.parking = new HashMap<Integer, Aircraft>();
-	    this.emergencyParking = new HashMap<Integer, Aircraft>();
+	    this.parking = new Aircraft[Parameters.parkingSize];
+	    this.emergencyParking = new Aircraft[Parameters.emergencyParkingSize];
 	}
 
 	public static Props props(String airportId, Runway[] runways) {
@@ -89,18 +89,33 @@ public class ControlTower extends AbstractActor {
 			// La pista va settata occupata
 			runway.setAircraftInRunway(landingAircraft);
 			runway.setStatus("OCCUPIED");
+		} else {
+			/* Se la coda di atterraggio è vuota si controlla quella di partenza */
+			startDeparture(runway);
 		}
 	}
 	
 	/* Metodo per chiudere la fase di atterraggio */
 	private void closeLandingPhase(Aircraft landedAircraft, Runway runway) {
-		int parkNumber = parking.size() + 1; //il numero del parcheggio del nuovo aereo
-		if (parkNumber <= Parameters.parkingSize)
-			parking.put(parkNumber, landedAircraft);
-		log.info("Aircraft {} is now parked at place n.{}", landedAircraft.getFlightId(), parkNumber);
-		// La pista va settata libera
-		runway.setAircraftInRunway(null);
-		runway.setStatus("FREE");
+		int parkNumber = -1; //il numero del parcheggio del nuovo aereo
+		
+		for (int i = 0; i < parking.length; i++) {
+			if (parking[i] == null) {
+				parkNumber = i;
+				break;
+			}
+		}
+		
+		if (parkNumber < 0) {
+			log.info("No free places in parking!");
+			return;
+		} else {
+			parking[parkNumber] = landedAircraft;
+			log.info("Aircraft {} is now parked at place n.{}", landedAircraft.getFlightId(), parkNumber + 1);
+			// La pista va settata libera
+			runway.setAircraftInRunway(null);
+			runway.setStatus("FREE");
+		}		
 	}
 	  
 	/* Metodo per il calcolo dei tempi di decollo */
@@ -121,8 +136,9 @@ public class ControlTower extends AbstractActor {
 			Aircraft departureAircraft = departureQueue.removeFirst();
 			log.info("Informing aircraft {} that it can start departure", departureAircraft.getFlightId());
 			/* Qui va inviato il messaggio per avviare la fase di rullaggio*/
+			departureAircraft.getAircraftActor().tell(new StartTakeOff(runway, departureAircraft.getFlightId()), getSelf());
 			/* Qui va liberato il parcheggio */
-			//departureAircraft.getAircraftActor().tell(new StartLanding(runway, landingAircraft.getFlightId()), getSelf());
+			freeParking(departureAircraft);
 			// La pista va settata occupata
 			runway.setAircraftInRunway(departureAircraft);
 			runway.setStatus("OCCUPIED");
@@ -178,20 +194,43 @@ public class ControlTower extends AbstractActor {
 	
 	/* Metodo per visualizzare il parcheggio */
 	private void printParking() {
-		if (parking.size() <= 0) {
+		/* QUESTO VA MODIFICATO */
+		if (isParkingEmpty()) {
 			log.info("No aircrafts in parking!");
+			return;
+		} else {
+			String message = "";
+			message += "\n********** PARKING **********";
+			for (int i = 0; i < parking.length; i++) {
+				message += "\n----------";
+				if (parking[i] == null)
+					message += "\n|" + Integer.toString(i+1) + ": EMPTY";
+				else
+					message += "\n|" + Integer.toString(i+1) + ": AIRCRAFT " + parking[i].getFlightId();
+				message += "\n----------";
+			}
+			message += "\n********** END OF PARKING **********";
+			log.info(message);
 		}
-		int i = 0;
-		String message = "";
-		message += "\n********** PARKING **********";
-		for (Aircraft a : parking.values()) {
-			message += "\n----------";
-			message += "\n|" + Integer.toString(i+1) + ": " + a.getFlightId();
-			message += "\n----------";
-			i++;
+	}
+	
+	/* Metodo per controllare se il parcheggio è vuoto */
+	private boolean isParkingEmpty() {
+		for (int i = 0; i < parking.length; i++) {
+			if (parking[i] != null)
+				return false;
 		}
-		message += "\n********** END OF PARKING **********";
-		log.info(message);
+		return true;
+	}
+	
+	/* Metodo per liberare il posto occupato da Aircraft nel parcheggio */
+	private void freeParking(Aircraft a) {
+		for (int i = 0; i < parking.length; i++) {
+			if (parking[i].getFlightId().equals(a.getFlightId())) {
+				parking[i] = null;
+				return;
+			}
+		}
 	}
 	
 	/* Metodo per visualizzare la coda di partenza */
@@ -248,17 +287,16 @@ public class ControlTower extends AbstractActor {
 		            		deleteAircraft(r.flightId);
 		            		printLandingQueue(); // metodo di debug
 		            	}
-		            	/* Se almeno una pista Ã¨ libera si da il via all'atterraggio al primo della coda */
+		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 		            	Runway freeRunway = getFreeRunway();
 		            	if (freeRunway != null)
 		            		startLanding(getSender(),freeRunway);
-		            		//startLanding(freeRunway);
 		            })
 	        .match(
         		EmergencyLandingConfirmation.class,
 	            r -> {
 	            	if(r.value) {
-	            		log.info("EMEREGNCY LANDING for aircraft {} confirmed", r.flightId);
+	            		log.info("EMERGENCY LANDING for aircraft {} confirmed", r.flightId);
 	            		informAircrafts();
 	            		printLandingQueue(); // metodo di debug
 	            	}
@@ -268,12 +306,23 @@ public class ControlTower extends AbstractActor {
 	            		printLandingQueue(); // metodo di debug
 	            	}
 	            })
+	        /* ========== ATTERRAGGIO ========== */
+	        .match(
+        		Landing.class,
+	            r -> {
+	            	log.info("Aircraft {} is now landing in runway {}", r.flightId, r.runway.getRunwayNumber());
+	            })
 	        /* ========== CHIUSURA FASE ATTERRAGGIO ========== */
 	        .match(
         		LandingComplete.class,
 	            r -> {
+	            	log.info("Aircraft {}: LANDED", r.flightId);
 	            	closeLandingPhase(r.runway.getAircraftInRunway(), r.runway);
 	            	printParking();
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
 	            })
 	        /* ========== RICHIESTE DECOLLO ========== */
 			.match(
@@ -285,6 +334,28 @@ public class ControlTower extends AbstractActor {
 	            	sender.tell(new RespondDepartureTime(r.flightId, timeForDeparture), getSelf());
 	            	log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
 	            	printDepartureQueue();
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
+	            })
+	        /* ========== DECOLLO ========== */
+	        .match(
+        		TakingOff.class,
+	            r -> {
+	            	log.info("Aircraft {} is now taking off from runway {}", r.flightId, r.runway.getRunwayNumber());
+	            })
+	        /* ========== CHIUSURA FASE DECOLLO ========== */
+	        .match(
+        		TakeOffComplete.class,
+	            r -> {
+	            	log.info("Aircraft {}: DEPARTED", r.flightId);
+	            	closeDeparturePhase(r.runway);
+	            	printParking();
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
 	            })
 	        .build();	    
 	  }

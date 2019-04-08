@@ -18,8 +18,8 @@ public class AirportSupervisor extends AbstractActor {
 	}
 	
 	//AEREI
-	ActorRef aircraft1 = getContext().actorOf(AircraftActor.props("FR0001"));
-	ActorRef aircraft2 = getContext().actorOf(AircraftActor.props("VY9999"));
+	ActorRef aircraft1 = getContext().actorOf(AircraftActor.props("FR0001"), "fr0001");
+	ActorRef aircraft2 = getContext().actorOf(AircraftActor.props("VY9999"), "vy9999");
 	
 
 	@Override
@@ -30,7 +30,7 @@ public class AirportSupervisor extends AbstractActor {
 		for (int i = 0; i < Parameters.runwaysNumber; i++) {
 			runways[i] = new Runway(i+1, "FREE");
 		}
-	    ActorRef controlTower = getContext().actorOf(ControlTower.props("CTA",runways));
+	    ActorRef controlTower = getContext().actorOf(ControlTower.props("CTA",runways), "cta");
 		aircraft1.tell(new StartLandingPhase(controlTower, 150), controlTower);
 		aircraft2.tell(new StartLandingPhase(controlTower, 75), controlTower);
 	}

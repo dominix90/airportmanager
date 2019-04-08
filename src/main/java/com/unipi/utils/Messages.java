@@ -116,9 +116,9 @@ public class Messages {
 		}
 	}
 	
-	/* SOURCE: Control Tower
-	 * DESTINATION: Aircraft
-	 * MESSAGE: Puoi iniziare l'atterraggio.
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Inizio l'atterraggio.
 	 */
 	public static final class Landing {
 		public final Runway runway;
@@ -164,11 +164,11 @@ public class Messages {
 	 * DESTINATION: Aircraft
 	 * MESSAGE: Self message schedulato per la prossima partenza.
 	 */
-	public static final class StartDeparture {
+	public static final class StartDeparturePhase {
 		public final String flightId;
 		public final ActorRef controlTower;
 
-		public StartDeparture(String flightId, ActorRef controlTower) {
+		public StartDeparturePhase(String flightId, ActorRef controlTower) {
 			this.flightId = flightId;
 			this.controlTower = controlTower;
 		}
@@ -214,4 +214,62 @@ public class Messages {
 			  this.timeForDeparture = timeForDeparture;
 		  }
 	  }	
+	
+	/* SOURCE: Control Tower
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Puoi iniziare il decollo.
+	 */
+	public static final class StartTakeOff {
+		public final Runway runway;
+		public final String flightId;
+
+		public StartTakeOff(Runway runway, String flightId) {
+			this.runway = runway;
+			this.flightId = flightId;
+		}
+	}
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Inizio il decollo.
+	 */
+	public static final class TakingOff {
+		public final Runway runway;
+		public final String flightId;
+
+		public TakingOff(Runway runway, String flightId) {
+			this.runway = runway;
+			this.flightId = flightId;
+		}
+	}	
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Self message schedulato alla fine del decollo.
+	 */
+	public static final class InTakeOffState {
+		public final Runway runway;
+		public final String flightId;
+		public final ActorRef controlTower;
+
+		public InTakeOffState(Runway runway, String flightId, ActorRef controlTower) {
+			this.runway = runway;
+			this.flightId = flightId;
+			this.controlTower = controlTower;
+		}
+	}
+	  
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Ho terminato il decollo.
+	 */   
+	public static final class TakeOffComplete {
+		public final Runway runway;
+		public final String flightId;
+		
+		public TakeOffComplete(Runway runway, String flightId) {
+			this.runway = runway;
+			this.flightId = flightId;
+		}
+	}	
 }

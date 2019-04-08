@@ -46,6 +46,7 @@ public class AircraftActor extends AbstractActor {
   @Override
   public Receive createReceive() {
     return receiveBuilder()
+    	/* ========== RICHIESTA DI ATTERRAGGIO ========== */
 		.match(
 			StartLandingPhase.class,
             r -> {
@@ -54,6 +55,7 @@ public class AircraftActor extends AbstractActor {
             		.tell(new LandingRequest(flightId), getSelf());
             	log.info("Landing request by aircraft {} to control tower", this.flightId);
             })
+    	/* ========== TEMPI DI ATTERRAGGIO ========== */
         .match(
     		RespondLandingTime.class,
             r -> {
@@ -76,32 +78,36 @@ public class AircraftActor extends AbstractActor {
 	      				getContext().stop(getSelf());
             	}
             })
+        /* ========== INIZIO FASE DI ATTERRAGGIO ========== */
         .match(
     		StartLanding.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		getSender().tell(new Landing(r.runway, r.flightId), getSelf());
-	            	log.info("Aircraft {} started landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
+            		/* Viene schedulato un messaggio da ricevere alla fine dell'atterraggio */
 	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new InLandingState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
             	}
             })
+        /* ========== ATTERRAGGIO ========== */
         .match(
         	InLandingState.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
-	            	log.info("Aircraft {} completed landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
-	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new StartDeparture(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
+            		/* Viene schedulato un messaggio da ricevere quando l'aereo dovrà ripartire */
+            		scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
             	}
             })
+        /* ========== RICHIESTA DI DECOLLO ========== */
         .match(
-            StartDeparture.class,
+            StartDeparturePhase.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		r.controlTower.tell(new DepartureRequest(r.flightId), getSelf());
 	            	log.info("Aircraft {} requested departure", this.flightId);
             	}
             })
+        /* ========== TEMPI DI DECOLLO ========== */
         .match(
     		RespondDepartureTime.class,
             r -> {
@@ -114,6 +120,26 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		
+            	}
+            })
+        /* ========== INIZIO FASE DI DECOLLO ========== */
+        .match(
+        	StartTakeOff.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		getSender().tell(new TakingOff(r.runway, r.flightId), getSelf());
+            		/* Viene schedulato un messaggio da ricevere alla fine del decollo */
+	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new InTakeOffState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
+            	}
+            })
+        /* ========== DECOLLO ========== */
+        .match(
+        	InTakeOffState.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		r.controlTower.tell(new TakeOffComplete(r.runway, r.flightId), getSelf());
+            		/* L'aereo abbandona il sistema */
+            		getContext().stop(getSelf());
             	}
             })
         .build();
