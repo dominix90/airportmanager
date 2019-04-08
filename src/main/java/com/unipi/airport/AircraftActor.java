@@ -6,21 +6,24 @@ import akka.event.LoggingAdapter;
 
 import java.time.Duration;
 
+import org.apache.commons.math3.distribution.*;
+
 import com.unipi.utils.Messages.*;
 
 public class AircraftActor extends AbstractActor {
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 
   private final String flightId;
-  private long remainingTime = 150;
+  private final long fuel;
   private Scheduler scheduler = getContext().getSystem().getScheduler();
 
-  public AircraftActor(String flightId) {
+  public AircraftActor(String flightId, long fuel) {
     this.flightId = flightId;
+    this.fuel = fuel;
   }
 
-  public static Props props(String flightId) {
-    return Props.create(AircraftActor.class, () -> new AircraftActor(flightId));
+  public static Props props(String flightId, long fuel) {
+    return Props.create(AircraftActor.class, () -> new AircraftActor(flightId, fuel));
   }
 
   @Override
@@ -37,11 +40,33 @@ public class AircraftActor extends AbstractActor {
 	  return this.flightId;
   }
   
+  /* Metodo per il controllo del carburante */
   private boolean sufficientFuel(long timeForNextLanding) {
-	  if (timeForNextLanding <= this.remainingTime)
+	  if (timeForNextLanding <= fuel)
 		  return true;
 	  return false;
   }
+  
+  /* ========== TEMPI DI DECOLLO, ATTERRAGGIO E PARCHEGGIO ========== */
+  /* Metodo per ottenimento durata atterraggio e decollo */
+  public double getRunwayOccupation() {
+		double time = 0.000;
+		
+		LogNormalDistribution lnd = new LogNormalDistribution(5.000, 0.500);
+		time = lnd.sample();
+		
+		return time * 1000;
+	}
+  
+  /* Metodo per ottenimento durata parcheggio */
+  public double getParkingOccupation() {
+		double time = 0.000;
+		
+		LogNormalDistribution lnd = new LogNormalDistribution(20.000, 2.000);
+		time = lnd.sample();
+		
+		return time * 1000;
+	}
 
   @Override
   public Receive createReceive() {
@@ -50,10 +75,10 @@ public class AircraftActor extends AbstractActor {
 		.match(
 			StartLandingPhase.class,
             r -> {
-            	this.remainingTime = r.fuel;
-            	getSender()
-            		.tell(new LandingRequest(flightId), getSelf());
-            	log.info("Landing request by aircraft {} to control tower", this.flightId);
+            	if (this.flightId.equals(r.flightId)) {
+	            	getSender().tell(new LandingRequest(flightId), getSelf());
+	            	log.info("Landing request by aircraft {} to control tower", this.flightId);
+            	}
             })
     	/* ========== TEMPI DI ATTERRAGGIO ========== */
         .match(
@@ -85,7 +110,7 @@ public class AircraftActor extends AbstractActor {
             	if (this.flightId.equals(r.flightId)) {
             		getSender().tell(new Landing(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere alla fine dell'atterraggio */
-	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new InLandingState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
+            		scheduler.scheduleOnce(Duration.ofMillis(Math.round(getRunwayOccupation())), getSelf(), new InLandingState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
             	}
             })
         /* ========== ATTERRAGGIO ========== */
@@ -95,7 +120,7 @@ public class AircraftActor extends AbstractActor {
             	if (this.flightId.equals(r.flightId)) {
             		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere quando l'aereo dovrà ripartire */
-            		scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
+            		scheduler.scheduleOnce(Duration.ofMillis(Math.round(getRunwayOccupation())), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
             	}
             })
         /* ========== RICHIESTA DI DECOLLO ========== */
@@ -129,7 +154,7 @@ public class AircraftActor extends AbstractActor {
             	if (this.flightId.equals(r.flightId)) {
             		getSender().tell(new TakingOff(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere alla fine del decollo */
-	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new InTakeOffState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
+	            	scheduler.scheduleOnce(Duration.ofMillis(Math.round(getRunwayOccupation())), getSelf(), new InTakeOffState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
             	}
             })
         /* ========== DECOLLO ========== */

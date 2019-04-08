@@ -5,20 +5,10 @@ import com.unipi.airport.*;
 
 public class Messages {
 	
-	/* SOURCE: AirportSupervisor
-	 * DESTINATION: Aircraft
-	 * MESSAGE: Puoi richiedere l'atterraggio.
-	 */
-	public static final class StartLandingPhase {
-		public final ActorRef controlTower;
-		public final long fuel;
-
-		  public StartLandingPhase(ActorRef controlTower, long fuel) {
-			  this.controlTower = controlTower;
-			  this.fuel = fuel;
-		  }
-	  }
-	  
+	/* ============================================================== */
+	/* =================== ATTERRAGGIO ============================== */
+	/* ============================================================== */
+	
 	/* SOURCE: Aircraft
 	 * DESTINATION: Control Tower
 	 * MESSAGE: Posso atterrare?
@@ -160,6 +150,10 @@ public class Messages {
 		}
 	}	
 	
+	/* ============================================================== */
+	/* ======================= DECOLLO ============================== */
+	/* ============================================================== */
+	
 	/* SOURCE: Aircraft
 	 * DESTINATION: Aircraft
 	 * MESSAGE: Self message schedulato per la prossima partenza.
@@ -271,5 +265,34 @@ public class Messages {
 			this.runway = runway;
 			this.flightId = flightId;
 		}
-	}	
+	}
+	
+	/* ============================================================== */
+	/* =================== TRAFFICO DI VOLO ========================= */
+	/* ============================================================== */
+	
+	/* SOURCE: AirportSupervisor
+	 * DESTINATION: AirportSupervisor
+	 * MESSAGE: Genera un nuovo aereo.
+	 */
+	public static final class AircraftGenerator {
+
+		  public AircraftGenerator() {
+			  
+		  }
+	  }
+	
+	/* SOURCE: AirportSupervisor
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Puoi richiedere l'atterraggio.
+	 */
+	public static final class StartLandingPhase {
+		public final ActorRef controlTower;
+		public final String flightId;
+
+		  public StartLandingPhase(ActorRef controlTower, String flightId) {
+			  this.controlTower = controlTower;
+			  this.flightId = flightId;
+		  }
+	  }
 }

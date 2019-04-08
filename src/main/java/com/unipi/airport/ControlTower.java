@@ -249,6 +249,19 @@ public class ControlTower extends AbstractActor {
 		log.info(message);
 	}
 	
+	/* Metodo per visualizzare lo stato delle piste */
+	private void checkRunways() {
+		String message = "";
+		message += "\n********** RUNWAYS STATE **********";
+		
+		for (int i = 0; i < runways.length; i++) {
+			message += "\nRunway " + Integer.toString(i+1) + ": " + runways[i].getStatus();
+		}
+		
+		message += "\n********** END OF RUNWAYS STATE **********";
+		log.info(message);
+	}
+	
 	/* ========== METODI PER GESTIONE MESSAGGI ========== */	
 
 	@Override
@@ -263,6 +276,11 @@ public class ControlTower extends AbstractActor {
             		landingQueue.add(new Aircraft(r.flightId,getSender()));
 	            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
 	            	log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
 	            })
 	        .match(
 		        EmergencyLandingRequest.class,
@@ -271,6 +289,11 @@ public class ControlTower extends AbstractActor {
             		landingQueue.addFirst(new Aircraft(r.flightId,getSender()));
 	            	sender.tell(new RespondLandingTime(r.flightId, 0), getSelf());
 	            	log.info("Control tower {} computed 0 seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, r.flightId);
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
             })
 	        /* ========== CONFERME ATTERRAGGIO ========== */
 	        .match(
@@ -288,6 +311,7 @@ public class ControlTower extends AbstractActor {
 		            		printLandingQueue(); // metodo di debug
 		            	}
 		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+		            	checkRunways();
 		            	Runway freeRunway = getFreeRunway();
 		            	if (freeRunway != null)
 		            		startLanding(getSender(),freeRunway);
@@ -305,6 +329,11 @@ public class ControlTower extends AbstractActor {
             			deleteAircraft(r.flightId);
 	            		printLandingQueue(); // metodo di debug
 	            	}
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
+	            	Runway freeRunway = getFreeRunway();
+	            	if (freeRunway != null)
+	            		startLanding(getSender(),freeRunway);
 	            })
 	        /* ========== ATTERRAGGIO ========== */
 	        .match(
@@ -320,6 +349,7 @@ public class ControlTower extends AbstractActor {
 	            	closeLandingPhase(r.runway.getAircraftInRunway(), r.runway);
 	            	printParking();
 	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null)
 	            		startLanding(getSender(),freeRunway);
@@ -335,6 +365,7 @@ public class ControlTower extends AbstractActor {
 	            	log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
 	            	printDepartureQueue();
 	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null)
 	            		startLanding(getSender(),freeRunway);
@@ -353,6 +384,7 @@ public class ControlTower extends AbstractActor {
 	            	closeDeparturePhase(r.runway);
 	            	printParking();
 	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
+	            	checkRunways();
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null)
 	            		startLanding(getSender(),freeRunway);
