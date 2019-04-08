@@ -51,7 +51,7 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	this.remainingTime = r.fuel;
             	getSender()
-            		.tell(new LandingRequest("00000001", flightId), getSelf());
+            		.tell(new LandingRequest(flightId), getSelf());
             	log.info("Landing request by aircraft {} to control tower", this.flightId);
             })
         .match(
@@ -87,12 +87,35 @@ public class AircraftActor extends AbstractActor {
             })
         .match(
         	InLandingState.class,
-                r -> {
-                	if (this.flightId.equals(r.flightId)) {
-                		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
-    	            	log.info("Aircraft {} completed landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
-                	}
-                })
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
+	            	log.info("Aircraft {} completed landing phase in runway {}", this.flightId, r.runway.getRunwayNumber());
+	            	scheduler.scheduleOnce(Duration.ofMillis(5000), getSelf(), new StartDeparture(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
+            	}
+            })
+        .match(
+            StartDeparture.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		r.controlTower.tell(new DepartureRequest(r.flightId), getSelf());
+	            	log.info("Aircraft {} requested departure", this.flightId);
+            	}
+            })
+        .match(
+    		RespondDepartureTime.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		
+            	}
+            })
+        .match(
+    		UpdateDepartureTime.class,
+            r -> {
+            	if (this.flightId.equals(r.flightId)) {
+            		
+            	}
+            })
         .build();
   }
 }

@@ -24,11 +24,9 @@ public class Messages {
 	 * MESSAGE: Posso atterrare?
 	 */
 	public static final class LandingRequest {
-		  public final String requestId;
 		  public final String flightId;
 
-		  public LandingRequest(String requestId, String flightId) {
-			  this.requestId = requestId;
+		  public LandingRequest(String flightId) {
 			  this.flightId = flightId;
 		  }
 	  }
@@ -38,11 +36,9 @@ public class Messages {
 	 * MESSAGE: Posso effettuare un atterraggio d'emergenza?
 	 */
 	public static final class EmergencyLandingRequest {
-		public final String requestId;
 		public final String flightId;
 
-		public EmergencyLandingRequest(String requestId, String flightId) {
-			  this.requestId = requestId;
+		public EmergencyLandingRequest(String flightId) {
 			  this.flightId = flightId;
 		  }
 	  }
@@ -52,12 +48,10 @@ public class Messages {
 	 * MESSAGE: Questo è il tempo calcolato per il tuo atterraggio.
 	 */  
 	public static final class RespondLandingTime {
-		  public final String requestId;
 		  public final String flightId;
 		  public final long timeForLanding;
 
-		  public RespondLandingTime(String requestId, String flightId, long timeForLanding) {
-			  this.requestId = requestId;
+		  public RespondLandingTime(String flightId, long timeForLanding) {
 			  this.flightId = flightId;
 			  this.timeForLanding = timeForLanding;
 		  }
@@ -165,4 +159,59 @@ public class Messages {
 			this.flightId = flightId;
 		}
 	}	
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Self message schedulato per la prossima partenza.
+	 */
+	public static final class StartDeparture {
+		public final String flightId;
+		public final ActorRef controlTower;
+
+		public StartDeparture(String flightId, ActorRef controlTower) {
+			this.flightId = flightId;
+			this.controlTower = controlTower;
+		}
+	}
+	  
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Posso partire?
+	 */
+	public static final class DepartureRequest {
+		  public final String flightId;
+
+		  public DepartureRequest(String flightId) {
+			  this.flightId = flightId;
+		  }
+	 }
+
+	/* SOURCE: Control Tower
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Questo è il tempo calcolato per il tuo decollo.
+	 */  
+	public static final class RespondDepartureTime {
+		  public final String flightId;
+		  public final long timeForDeparture;
+
+		  public RespondDepartureTime(String flightId, long timeForDeparture) {
+			  this.flightId = flightId;
+			  this.timeForDeparture = timeForDeparture;
+		  }
+	  }
+	  
+	/* SOURCE: Control Tower
+	 * DESTINATION: Aircraft
+	 * MESSAGE: E' stata aggiornata la coda d'atterraggio o di decollo.
+	 * 			Questo è il nuovo tempo calcolato per il tuo decollo.
+	 */   
+	public static final class UpdateDepartureTime {
+		  public final String flightId;
+		  public final long timeForDeparture;
+
+		  public UpdateDepartureTime(String flightId, long timeForDeparture) {
+			  this.flightId = flightId;
+			  this.timeForDeparture = timeForDeparture;
+		  }
+	  }	
 }

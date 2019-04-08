@@ -109,9 +109,32 @@ public class ControlTower extends AbstractActor {
 		  
 		int departureQueueSize = departureQueue.size();
 		int landingQueueSize = landingQueue.size();
-		time = Parameters.averageRunwayOccupation * (landingQueueSize + departureQueueSize);
+		time = Parameters.averageRunwayOccupation * (landingQueueSize + departureQueueSize) / runways.length;
 		  
 		return time;
+	}
+	
+	/* Metodo per avviare la fase di atterraggio */
+	private void startDeparture(Runway runway) {
+	//private void startLanding(Runway runway) {	
+		if (departureQueue.size() > 0) {
+			Aircraft departureAircraft = departureQueue.removeFirst();
+			log.info("Informing aircraft {} that it can start departure", departureAircraft.getFlightId());
+			/* Qui va inviato il messaggio per avviare la fase di rullaggio*/
+			/* Qui va liberato il parcheggio */
+			//departureAircraft.getAircraftActor().tell(new StartLanding(runway, landingAircraft.getFlightId()), getSelf());
+			// La pista va settata occupata
+			runway.setAircraftInRunway(departureAircraft);
+			runway.setStatus("OCCUPIED");
+		}
+	}
+	
+	/* Metodo per chiudere la fase di atterraggio */
+	private void closeDeparturePhase(Runway runway) {
+		
+		// La pista va settata libera
+		runway.setAircraftInRunway(null);
+		runway.setStatus("FREE");
 	}
 	
 	/* Aggiornamento dei tempi in caso di atterraggio d'emergenza */
@@ -199,7 +222,7 @@ public class ControlTower extends AbstractActor {
 	            	ActorRef sender = getSender();
 	            	long timeForLanding = getTimeForLanding(sender);
             		landingQueue.add(new Aircraft(r.flightId,getSender()));
-	            	sender.tell(new RespondLandingTime(r.requestId, r.flightId, timeForLanding), getSelf());
+	            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
 	            	log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
 	            })
 	        .match(
@@ -207,7 +230,7 @@ public class ControlTower extends AbstractActor {
 	            r -> {
 	            	ActorRef sender = getSender();
             		landingQueue.addFirst(new Aircraft(r.flightId,getSender()));
-	            	sender.tell(new RespondLandingTime(r.requestId, r.flightId, 0), getSelf());
+	            	sender.tell(new RespondLandingTime(r.flightId, 0), getSelf());
 	            	log.info("Control tower {} computed 0 seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, r.flightId);
             })
 	        /* ========== CONFERME ATTERRAGGIO ========== */
@@ -251,6 +274,17 @@ public class ControlTower extends AbstractActor {
 	            r -> {
 	            	closeLandingPhase(r.runway.getAircraftInRunway(), r.runway);
 	            	printParking();
+	            })
+	        /* ========== RICHIESTE DECOLLO ========== */
+			.match(
+				DepartureRequest.class,
+	            r -> {
+	            	ActorRef sender = getSender();
+	            	long timeForDeparture = getTimeForTakingOff(sender);
+            		departureQueue.add(new Aircraft(r.flightId,getSender()));
+	            	sender.tell(new RespondDepartureTime(r.flightId, timeForDeparture), getSelf());
+	            	log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
+	            	printDepartureQueue();
 	            })
 	        .build();	    
 	  }
