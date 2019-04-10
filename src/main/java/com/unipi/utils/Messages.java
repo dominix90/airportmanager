@@ -32,10 +32,22 @@ public class Messages {
 			  this.flightId = flightId;
 		  }
 	  }
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Parcheggio pieno, impossibile ospitare nuovi aerei.
+	 */  
+	public static final class LandingDenial {
+		  public final String flightId;
+
+		  public LandingDenial(String flightId) {
+			  this.flightId = flightId;
+		  }
+	  }
 
 	/* SOURCE: Control Tower
 	 * DESTINATION: Aircraft
-	 * MESSAGE: Questo Ã¨ il tempo calcolato per il tuo atterraggio.
+	 * MESSAGE: Questo è il tempo calcolato per il tuo atterraggio.
 	 */  
 	public static final class RespondLandingTime {
 		  public final String flightId;
@@ -50,7 +62,7 @@ public class Messages {
 	/* SOURCE: Control Tower
 	 * DESTINATION: Aircraft
 	 * MESSAGE: E' stata aggiornata la coda d'atterraggio in seguito ad una richiesta d'emergenza.
-	 * 			Questo Ã¨ il nuovo tempo calcolato per il tuo atterraggio.
+	 * 			Questo è il nuovo tempo calcolato per il tuo atterraggio.
 	 */   
 	public static final class UpdateLandingTime {
 		  public final String flightId;
@@ -69,10 +81,12 @@ public class Messages {
 	public static final class EmergencyLandingConfirmation {
 		  public final boolean value;
 		  public final String flightId;
+			public final int confirmationType; // 1 --> prima richiesta; 2 --> risposta ad aggiornamento code
 
-		  public EmergencyLandingConfirmation(boolean value, String flightId) {
+		  public EmergencyLandingConfirmation(boolean value, String flightId, int confirmationType) {
 			  this.value = value;
 			  this.flightId = flightId;
+				this.confirmationType = confirmationType;
 		  }
 	  }
 	  
@@ -143,10 +157,12 @@ public class Messages {
 	public static final class LandingComplete {
 		public final Runway runway;
 		public final String flightId;
+		public final boolean inEmergency;
 		
-		public LandingComplete(Runway runway, String flightId) {
+		public LandingComplete(Runway runway, String flightId, boolean inEmergency) {
 			this.runway = runway;
 			this.flightId = flightId;
+			this.inEmergency = inEmergency;
 		}
 	}	
 	
@@ -295,4 +311,23 @@ public class Messages {
 			  this.flightId = flightId;
 		  }
 	  }
+	
+	/* ============================================================== */
+	/* ========================= CARBURANTE ========================= */
+	/* ============================================================== */
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Carburante in riserva.
+	 */
+	public static final class FuelReserve {
+		public final String flightId;
+		public final ActorRef controlTower;
+
+		public FuelReserve(String flightId, ActorRef controlTower) {
+			this.flightId = flightId;
+			this.controlTower = controlTower;
+		}
+	}
+	
 }

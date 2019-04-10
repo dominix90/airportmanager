@@ -28,7 +28,7 @@ public class AirportSupervisor extends AbstractActor {
 		
 		//AEREO INIZIALE
 		String flightId = generateFlightId(6);
-    	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue())), flightId.toLowerCase());
+    	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());
     	double nextArrival = getTimeForNextArrival();
     	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);
     	log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
@@ -59,7 +59,7 @@ public class AirportSupervisor extends AbstractActor {
 	}
 	
 	/* Generazione del flightId */
-	private static final String ALPHA_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};// "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	private static final String NUMERIC_STRING = "0123456789";
 
 	public static String generateFlightId(int count) {
@@ -69,9 +69,9 @@ public class AirportSupervisor extends AbstractActor {
 		int character = -1;
 		
 		while (count-- != 0) {
-			if (count >= initialCount - 2) {
-				character = (int)(Math.random()*ALPHA_STRING.length());
-				builder.append(ALPHA_STRING.charAt(character));
+			if (count >= initialCount - 1) {
+				character = (int)(Math.random()*ALPHA_STRING.length);
+				builder.append(ALPHA_STRING[character]);
 			}
 			else {
 				character = (int)(Math.random()*NUMERIC_STRING.length());
@@ -86,7 +86,7 @@ public class AirportSupervisor extends AbstractActor {
 	public double getTimeForNextArrival() {
 		double time = 0.000;
 		
-		ExponentialDistribution exp = new ExponentialDistribution(6.000);
+		ExponentialDistribution exp = new ExponentialDistribution(10.000);
 		time = exp.sample();
 		
 		return time * 1000;
@@ -102,6 +102,13 @@ public class AirportSupervisor extends AbstractActor {
 		return fuel * 1000;
 	}
 	
+	/* Generazione del boolean inEmergency */
+	public boolean getEmergencyState() {
+		if (new UniformRealDistribution(0,100).sample() >= 95)
+			return true;
+		return false;
+	}
+	
 	
 	@Override
 	public Receive createReceive() {
@@ -113,7 +120,7 @@ public class AirportSupervisor extends AbstractActor {
 	            r -> {
 	            	String flightId = generateFlightId(6);
 	            	double nextArrival = getTimeForNextArrival();
-	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue())), flightId.toLowerCase());	
+	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());	
 	            	newAircraft.tell(new StartLandingPhase(controlTower, flightId), controlTower);
 	            	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);	            	
 	            	log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);

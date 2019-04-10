@@ -1,8 +1,6 @@
 package com.unipi.utils;
 
-
-public class Parameters {
-	
+public final class Parameters {
 	/* ========== PARAMETRI PER CONTROL TOWER ========== */
 	public static final int averageRunwayOccupation = 5000;
 	public static final int runwaysNumber = 2;
