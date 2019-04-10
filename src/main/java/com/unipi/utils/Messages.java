@@ -157,12 +157,10 @@ public class Messages {
 	public static final class LandingComplete {
 		public final Runway runway;
 		public final String flightId;
-		public final boolean inEmergency;
 		
-		public LandingComplete(Runway runway, String flightId, boolean inEmergency) {
+		public LandingComplete(Runway runway, String flightId) {
 			this.runway = runway;
 			this.flightId = flightId;
-			this.inEmergency = inEmergency;
 		}
 	}	
 	
@@ -190,9 +188,11 @@ public class Messages {
 	 */
 	public static final class DepartureRequest {
 		  public final String flightId;
+		  public final boolean inEmergency;
 
-		  public DepartureRequest(String flightId) {
+		  public DepartureRequest(String flightId, boolean inEmergency) {
 			  this.flightId = flightId;
+				this.inEmergency = inEmergency;
 		  }
 	 }
 

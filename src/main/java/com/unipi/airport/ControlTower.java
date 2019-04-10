@@ -98,23 +98,44 @@ public class ControlTower extends AbstractActor {
 	private void closeLandingPhase(Aircraft landedAircraft, Runway runway) {
 		int parkNumber = -1; //il numero del parcheggio del nuovo aereo
 		
-		for (int i = 0; i < parking.length; i++) {
-			if (parking[i] == null) {
-				parkNumber = i;
-				break;
+		if (landedAircraft.getEmergencyState()) {
+			for (int i = 0; i < emergencyParking.length; i++) {
+				if (emergencyParking[i] == null) {
+					parkNumber = i;
+					break;
+				}
 			}
-		}
-		
-		if (parkNumber < 0) {
-			log.info("No free places in parking!");
-			return;
+			
+			if (parkNumber < 0) {
+				log.info("No free places in parking!");
+				return;
+			} else {
+				emergencyParking[parkNumber] = landedAircraft;
+				log.info("Aircraft {} is now parked at place n.{} of the emergencyParking", landedAircraft.getFlightId(), parkNumber + 1);
+				// La pista va settata libera	
+				runway.setAircraftInRunway(null);
+				runway.setStatus("FREE");			
+			}	
 		} else {
-			parking[parkNumber] = landedAircraft;
-			log.info("Aircraft {} is now parked at place n.{}", landedAircraft.getFlightId(), parkNumber + 1);
-			// La pista va settata libera	
-			runway.setAircraftInRunway(null);
-			runway.setStatus("FREE");			
-		}		
+			for (int i = 0; i < parking.length; i++) {
+				if (parking[i] == null) {
+					parkNumber = i;
+					break;
+				}
+			}
+			
+			if (parkNumber < 0) {
+				log.info("No free places in parking!");
+				return;
+			} else {
+				parking[parkNumber] = landedAircraft;
+				log.info("Aircraft {} is now parked at place n.{}", landedAircraft.getFlightId(), parkNumber + 1);
+				// La pista va settata libera	
+				runway.setAircraftInRunway(null);
+				runway.setStatus("FREE");			
+			}	
+		}
+			
 	}
 	  
 	/* Metodo per il calcolo dei tempi di decollo */
@@ -212,6 +233,15 @@ public class ControlTower extends AbstractActor {
 		}
 	}
 	
+	/* Metodo per controllare se ci sono posti liberi nel parcheggio */
+	private boolean isThereFreeParking() {
+		for (int i = 0; i < parking.length; i++) {
+			if (parking[i] == null)
+				return true;
+		}
+		return false;
+	}
+	
 	/* Metodo per controllare se il parcheggio è vuoto */
 	private boolean isParkingEmpty() {
 		for (int i = 0; i < parking.length; i++) {
@@ -223,12 +253,23 @@ public class ControlTower extends AbstractActor {
 	
 	/* Metodo per liberare il posto occupato da Aircraft nel parcheggio */
 	private void freeParking(Aircraft a) {
-		for (int i = 0; i < parking.length; i++) {
-			if (parking[i] == null)
-				continue;
-			if (parking[i].getFlightId().equals(a.getFlightId())) {
-				parking[i] = null;
-				return;
+		if (a.getEmergencyState()) {
+			for (int i = 0; i < emergencyParking.length; i++) {
+				if (emergencyParking[i] == null)
+					continue;
+				if (emergencyParking[i].getFlightId().equals(a.getFlightId())) {
+					emergencyParking[i] = null;
+					return;
+				}
+			}
+		} else {
+			for (int i = 0; i < parking.length; i++) {
+				if (parking[i] == null)
+					continue;
+				if (parking[i].getFlightId().equals(a.getFlightId())) {
+					parking[i] = null;
+					return;
+				}
 			}
 		}
 	}
@@ -271,10 +312,10 @@ public class ControlTower extends AbstractActor {
 			.match(
 	        	LandingRequest.class,
 	            r -> {
-	            	if (isParkingEmpty()) {
+	            	if (isThereFreeParking()) {
 	            		ActorRef sender = getSender();
 		            	long timeForLanding = getTimeForLanding(sender);
-	            		landingQueue.add(new Aircraft(r.flightId,getSender()));
+	            		landingQueue.add(new Aircraft(r.flightId,getSender(),false));
 		            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
 		            	log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
 		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
@@ -291,7 +332,7 @@ public class ControlTower extends AbstractActor {
 		        EmergencyLandingRequest.class,
 	            r -> {
 	            	ActorRef sender = getSender();
-            		landingQueue.addFirst(new Aircraft(r.flightId,getSender()));
+            		landingQueue.addFirst(new Aircraft(r.flightId,getSender(),true));
 	            	sender.tell(new RespondLandingTime(r.flightId, 0), getSelf());
 	            	log.info("Control tower {} computed 0 seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, r.flightId);
 	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
@@ -369,7 +410,7 @@ public class ControlTower extends AbstractActor {
 	            r -> {
 	            	ActorRef sender = getSender();
 	            	long timeForDeparture = getTimeForTakingOff(sender);
-            		departureQueue.add(new Aircraft(r.flightId,getSender()));
+            		departureQueue.add(new Aircraft(r.flightId,getSender(),r.inEmergency));
 	            	sender.tell(new RespondDepartureTime(r.flightId, timeForDeparture), getSelf());
 	            	log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
 	            	printDepartureQueue();

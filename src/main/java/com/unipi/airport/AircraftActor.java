@@ -165,7 +165,7 @@ public class AircraftActor extends AbstractActor {
         	InLandingState.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		r.controlTower.tell(new LandingComplete(r.runway, r.flightId, inEmergency), getSelf());
+            		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere quando l'aereo dovrà ripartire */
             		scheduler.scheduleOnce(Duration.ofMillis(Math.round(getRunwayOccupation())), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
             	}
@@ -175,7 +175,7 @@ public class AircraftActor extends AbstractActor {
             StartDeparturePhase.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		r.controlTower.tell(new DepartureRequest(r.flightId), getSelf());
+            		r.controlTower.tell(new DepartureRequest(r.flightId,inEmergency), getSelf());
 	            	log.info("Aircraft {} requested departure", this.flightId);
             	}
             })
