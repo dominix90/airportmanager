@@ -35,7 +35,7 @@ public class AircraftActor extends AbstractActor {
   public void preStart() {
 	  log.info("Aircraft actor {} started", flightId);
 	  /* Viene schedulato un messaggio da ricevere per il consumo di carburante */
-	  fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId, controlTower), getContext().getSystem().dispatcher(), null);
+	  fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId), getContext().getSystem().dispatcher(), null);
   }
 
   @Override
@@ -84,17 +84,17 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		if (fuel <= 0) {
-            			/* Se il carburante è non positivo allora l'aereo usa il carburante d'emergenza 
+            			/* Se il carburante ï¿½ non positivo allora l'aereo usa il carburante d'emergenza 
             			 * per raggiungere un altro aeroporto. Nel momento in cui la torre di 
             			 * controllo da il via all'atterraggio il timer viene annullato 
             			 */
-	            		if (r.controlTower != null)
-	            			r.controlTower.tell(new LandingConfirmation(false, flightId, 1), getSelf());
+	            		if (controlTower != null)
+	            			controlTower.tell(new LandingConfirmation(false, flightId, 1), getSelf());
 	            		getContext().stop(getSelf());
             		} else {
             			/* Viene schedulato un messaggio da ricevere per il consumo di carburante */
             			fuel = fuel - 1000;
-            			fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId, controlTower), getContext().getSystem().dispatcher(), null);
+            			fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId), getContext().getSystem().dispatcher(), null);
             		}
             	}
             })	
@@ -123,28 +123,34 @@ public class AircraftActor extends AbstractActor {
     		RespondLandingTime.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		boolean landingConfirmation = sufficientFuel(r.timeForLanding);
-            		if (inEmergency)
-            			getSender().tell(new EmergencyLandingConfirmation(landingConfirmation, flightId, 1), getSelf());
-            		else
+            		if (inEmergency) {
+            			getSender().tell(new EmergencyLandingConfirmation(true, flightId, 1), getSelf());
+            			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            		}
+            		else {
+            			boolean landingConfirmation = sufficientFuel(r.timeForLanding);
             			getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 1), getSelf());
-	      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
-	      			if (!landingConfirmation)
-	      				getContext().stop(getSelf());
+		      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+		      			if (!landingConfirmation)
+		      				getContext().stop(getSelf());
+            		}
             	}
             })
         .match(
     		UpdateLandingTime.class,
             r -> {
-            	if (this.flightId.equals(r.flightId)) {
-            		boolean landingConfirmation = sufficientFuel(r.timeForLanding);
-            		if (inEmergency)
-            			getSender().tell(new EmergencyLandingConfirmation(landingConfirmation, flightId, 2), getSelf());
-            		else
+            	if (this.flightId.equals(r.flightId)) {            		
+            		if (inEmergency) {
+            			getSender().tell(new EmergencyLandingConfirmation(true, flightId, 2), getSelf());
+            			log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
+            		}
+            		else {
+            			boolean landingConfirmation = sufficientFuel(r.timeForLanding);
             			getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 2), getSelf());	            	
-	            	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
-	            	if (!landingConfirmation)
-	      				getContext().stop(getSelf());
+		            	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
+		            	if (!landingConfirmation)
+		      				getContext().stop(getSelf());
+            		}
             	}
             })
         /* ========== INIZIO FASE DI ATTERRAGGIO ========== */
@@ -166,8 +172,8 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
-            		/* Viene schedulato un messaggio da ricevere quando l'aereo dovrà ripartire */
-            		scheduler.scheduleOnce(Duration.ofMillis(Math.round(getRunwayOccupation())), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
+            		/* Viene schedulato un messaggio da ricevere quando l'aereo dovrï¿½ ripartire */
+            		scheduler.scheduleOnce(Duration.ofMillis(Math.round(getParkingOccupation())), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
             	}
             })
         /* ========== RICHIESTA DI DECOLLO ========== */

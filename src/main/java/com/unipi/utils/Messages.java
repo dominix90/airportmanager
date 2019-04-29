@@ -47,7 +47,7 @@ public class Messages {
 
 	/* SOURCE: Control Tower
 	 * DESTINATION: Aircraft
-	 * MESSAGE: Questo è il tempo calcolato per il tuo atterraggio.
+	 * MESSAGE: Questo ï¿½ il tempo calcolato per il tuo atterraggio.
 	 */  
 	public static final class RespondLandingTime {
 		  public final String flightId;
@@ -62,7 +62,7 @@ public class Messages {
 	/* SOURCE: Control Tower
 	 * DESTINATION: Aircraft
 	 * MESSAGE: E' stata aggiornata la coda d'atterraggio in seguito ad una richiesta d'emergenza.
-	 * 			Questo è il nuovo tempo calcolato per il tuo atterraggio.
+	 * 			Questo ï¿½ il nuovo tempo calcolato per il tuo atterraggio.
 	 */   
 	public static final class UpdateLandingTime {
 		  public final String flightId;
@@ -322,11 +322,9 @@ public class Messages {
 	 */
 	public static final class FuelReserve {
 		public final String flightId;
-		public final ActorRef controlTower;
 
-		public FuelReserve(String flightId, ActorRef controlTower) {
+		public FuelReserve(String flightId) {
 			this.flightId = flightId;
-			this.controlTower = controlTower;
 		}
 	}
 	

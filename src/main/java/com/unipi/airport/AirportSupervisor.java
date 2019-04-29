@@ -14,6 +14,7 @@ public class AirportSupervisor extends AbstractActor {
 	
 	private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 	private Scheduler scheduler = getContext().getSystem().getScheduler();
+	private int sequenceNumber = 0;
 
 	public static Props props() {
 		return Props.create(AirportSupervisor.class);
@@ -59,11 +60,14 @@ public class AirportSupervisor extends AbstractActor {
 	}
 	
 	/* Generazione del flightId */
-	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};// "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};
 	private static final String NUMERIC_STRING = "0123456789";
 
-	public static String generateFlightId(int count) {
+	public String generateFlightId(int count) {
+		
 		StringBuilder builder = new StringBuilder();
+		builder.append(sequenceNumber);
+		builder.append("-");
 		
 		int initialCount = count;
 		int character = -1;
@@ -118,6 +122,7 @@ public class AirportSupervisor extends AbstractActor {
 			.match(
 				AircraftGenerator.class,
 	            r -> {
+	            	sequenceNumber++;
 	            	String flightId = generateFlightId(6);
 	            	double nextArrival = getTimeForNextArrival();
 	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());	
