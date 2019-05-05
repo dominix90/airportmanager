@@ -14,22 +14,24 @@ public class ControlTower extends AbstractActor {
 	/* ========== VARIABILI E STRUTTURE DATI ========== */	
 	private final String airportId; //id aeroporto
 	private Runway[] runways;
-	private Deque<Aircraft> landingQueue;
-	private Deque<Aircraft> emergencyLandingQueue;
-	private Deque<Aircraft> departureQueue;
-	private Aircraft[] parking;
-	private Aircraft[] emergencyParking;
+	private int numberOfAircrafts;
+	private LinkedList<Aircraft> landingQueue;
+	private LinkedList<Aircraft> emergencyLandingQueue;
+	private LinkedList<Aircraft> departureQueue;
+	private LinkedList<Aircraft> parking;
+	private LinkedList<Aircraft> emergencyParking;
 	
 	/* ========== COSTRUTTORE E METODI NATIVI ========== */	
 
 	public ControlTower(String airportId, Runway[] runways) {
 	    this.airportId = airportId;
 	    this.runways = runways;
+	    this.numberOfAircrafts = 0;
 	    this.landingQueue = new LinkedList<Aircraft>();
 	    this.emergencyLandingQueue = new LinkedList<Aircraft>();
 	    this.departureQueue = new LinkedList<Aircraft>();
-	    this.parking = new Aircraft[Parameters.parkingSize];
-	    this.emergencyParking = new Aircraft[Parameters.emergencyParkingSize];
+	    this.parking = new LinkedList<Aircraft>();
+	    this.emergencyParking = new LinkedList<Aircraft>();
 	}
 
 	public static Props props(String airportId, Runway[] runways) {
@@ -38,135 +40,170 @@ public class ControlTower extends AbstractActor {
 	  
 	@Override
 	public void preStart() {
-		log.info("ControlTower actor {} started", airportId);
+		if(Parameters.logVerbose) log.info("ControlTower actor {} started", airportId);
 	}
 
 	@Override
 	public void postStop() {
-		log.info("ControlTower actor {} stopped", airportId);
+		if(Parameters.logVerbose) log.info("ControlTower actor {} stopped", airportId);
 	}
 
-	/* ========== METODI PER GESTIONE CODE E TEMPI ========== */	
+	/* ========== METODI PER GESTIONE TEMPI NELLE CODE ========== */	
 	  
 	/* Metodo per il calcolo dei tempi d'atterraggio */
-	private long getTimeForLanding(ActorRef aircraft) {
+	private long getTimeForLanding(String flightId) {
 		long time = 0;
-		  
-		int queueSize = landingQueue.size();
-		if (queueSize != 0)
-			time = Parameters.averageRunwayOccupation * queueSize / runways.length;
+		int RO = 0; //Runway occupancy: se tutte le piste sono occupate questo deve essere 1
+		
+		if ( getFreeRunway() == null )
+			RO = 1;
+		
+		int flightIndex = -1;		
+		for( Aircraft a : landingQueue ) {
+			if(a.getFlightId()==flightId) {
+				flightIndex = landingQueue.indexOf(a);
+				break;
+			}
+		}
+		
+		int queueSize = flightIndex + emergencyLandingQueue.size();
+		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
 		  
 		return time;
 	}
 	
-	/* Metodo per la gestione dei casi in cui un aereo decide di abbandonare 
-	 * la coda di atterraggio in seguito ad un aggiornamento dei tempi
-	 */
-	private void deleteAircraft(String aircraftToDelete) {
-		Deque<Aircraft> landingQueueTemp = new LinkedList<Aircraft>(); //questa variabile conterrà la coda rigenerata
-		Aircraft aircraftTemp; //questa variabile conterrà l'aereo correntemente in esame
+	/* Metodo per il calcolo dei tempi d'atterraggio di emergenza */
+	private long getTimeForEmergencyLanding(String flightId) {
+		long time = 0;
+		int RO = 0; //Runway occupancy: se tutte le piste sono occupate questo deve essere 1
 		
-		for (int i = 0; i < landingQueue.size(); i++) {
-			aircraftTemp = landingQueue.removeFirst();
-			
-			if (!aircraftTemp.getFlightId().equals(aircraftToDelete)) {
-				landingQueueTemp.add(aircraftTemp);
+		if ( getFreeRunway() == null )
+			RO = 1;
+		
+		int flightIndex = -1;		
+		for( Aircraft a : emergencyLandingQueue ) {
+			if(a.getFlightId()==flightId) {
+				flightIndex = emergencyLandingQueue.indexOf(a);
+				break;
 			}
 		}
 		
-		/* Dopo aver controllato tutta la coda originale ed aver 
-		 * rigenerato una coda parallela senza l'aereo da eliminare 
-		 * viene resa ufficiale la nuova coda 
-		 */
-		landingQueue = landingQueueTemp;
+		int queueSize = flightIndex;
+		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
+		  
+		return time;
 	}
+	
+	/* Metodo per il calcolo dei tempi di decollo */
+	private long getTimeForTakingOff(String flightId) {
+		long time = 0;
+		int RO = 0; //Runway occupancy: se tutte le piste sono occupate questo deve essere 1
+		
+		if ( getFreeRunway() == null )
+			RO = 1;
+		
+		int flightIndex = -1;		
+		for( Aircraft a : departureQueue ) {
+			if(a.getFlightId()==flightId) {
+				flightIndex = departureQueue.indexOf(a);
+				break;
+			}
+		}
+		
+		int queueSize = landingQueue.size() + emergencyLandingQueue.size() + flightIndex;
+		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
+		  
+		return time;
+	}
+	
+	/* ========== METODI PER RIMOZIONE AEREI DALLE STRUTTURE DATI ========== */	
+	
+	/* Metodo per la gestione dei casi in cui un aereo decide di abbandonare 
+	 * la coda di atterraggio
+	 */
+	private void deleteAircraft(String flightId) {
+		/*
+		 * for( Aircraft a : emergencyLandingQueue ) { if(a.getFlightId()==flightId) {
+		 * emergencyLandingQueue.remove(a); return; } }
+		 */
+		
+		for( Aircraft a : landingQueue ) {
+			if(a.getFlightId()==flightId) {
+				landingQueue.remove(a);
+				return;
+			}
+		}
+	}
+	
+	/* Metodo per liberare il posto occupato da Aircraft nel parcheggio */
+	private void freeParking(String flightId) {
+		for( Aircraft a : emergencyParking ) {
+			if(a.getFlightId()==flightId) {
+				emergencyParking.remove(a);
+				return;
+			}
+		}
+		
+		for( Aircraft a : parking ) {
+			if(a.getFlightId()==flightId) {
+				parking.remove(a);
+				return;
+			}
+		}
+	}
+	
+	/* ========== METODI PER GESTIONE ATTERRAGGIO E DECOLLO ========== */	
 	
 	/* Metodo per avviare la fase di atterraggio */
 	private void startLanding(Runway runway) {
 		if (emergencyLandingQueue.size() > 0) {
 			Aircraft landingAircraft = emergencyLandingQueue.removeFirst();
-			log.info("Informing aircraft {} that it can start landing", landingAircraft.getFlightId());
+			if(Parameters.logVerbose) log.info("Informing aircraft {} that it can start landing", landingAircraft.getFlightId());
 			landingAircraft.getAircraftActor().tell(new StartLanding(runway, landingAircraft.getFlightId()), getSelf());
 			// La pista va settata occupata
 			runway.setAircraftInRunway(landingAircraft);
 			runway.setStatus("OCCUPIED");
 		} else if (landingQueue.size() > 0) {
 			Aircraft landingAircraft = landingQueue.removeFirst();
-			log.info("Informing aircraft {} that it can start landing", landingAircraft.getFlightId());
+			if(Parameters.logVerbose) log.info("Informing aircraft {} that it can start landing", landingAircraft.getFlightId());
 			landingAircraft.getAircraftActor().tell(new StartLanding(runway, landingAircraft.getFlightId()), getSelf());
 			// La pista va settata occupata
 			runway.setAircraftInRunway(landingAircraft);
 			runway.setStatus("OCCUPIED");
 		} else {
-			/* Se la coda di atterraggio � vuota si controlla quella di partenza */
+			/* Se le code di atterraggio sono vuote si controlla quella di partenza */
 			startDeparture(runway);
 		}
 	}
 	
 	/* Metodo per chiudere la fase di atterraggio */
 	private void closeLandingPhase(Aircraft landedAircraft, Runway runway) {
-		int parkNumber = -1; //il numero del parcheggio del nuovo aereo
 		
 		if (landedAircraft.getEmergencyState()) {
-			for (int i = 0; i < emergencyParking.length; i++) {
-				if (emergencyParking[i] == null) {
-					parkNumber = i;
-					break;
-				}
-			}
-			
-			if (parkNumber < 0) {
-				log.info("No free places in parking!");
-				return;
-			} else {
-				emergencyParking[parkNumber] = landedAircraft;
-				log.info("Aircraft {} is now parked at place n.{} of the emergencyParking", landedAircraft.getFlightId(), parkNumber + 1);
-				// La pista va settata libera	
-				runway.setAircraftInRunway(null);
-				runway.setStatus("FREE");			
-			}	
+			emergencyParking.add(landedAircraft);
+			if(Parameters.logVerbose) log.info("Aircraft {} is now parked in the emergencyParking", landedAircraft.getFlightId());	
 		} else {
-			for (int i = 0; i < parking.length; i++) {
-				if (parking[i] == null) {
-					parkNumber = i;
-					break;
-				}
-			}
-			
-			if (parkNumber < 0) {
-				log.info("No free places in parking!");
-				return;
-			} else {
-				parking[parkNumber] = landedAircraft;
-				log.info("Aircraft {} is now parked at place n.{}", landedAircraft.getFlightId(), parkNumber + 1);
-				// La pista va settata libera	
-				runway.setAircraftInRunway(null);
-				runway.setStatus("FREE");			
-			}	
+			parking.add(landedAircraft);
+			if(Parameters.logVerbose) log.info("Aircraft {} is now parked in the parking", landedAircraft.getFlightId());
 		}
+		
+		// La pista va settata libera	
+		runway.setAircraftInRunway(null);
+		runway.setStatus("FREE");	
 			
 	}
 	  
-	/* Metodo per il calcolo dei tempi di decollo */
-	private long getTimeForTakingOff(ActorRef aircraft) {
-		long time = 0;
-		  
-		int departureQueueSize = departureQueue.size();
-		int landingQueueSize = landingQueue.size();
-		time = Parameters.averageRunwayOccupation * (landingQueueSize + departureQueueSize) / runways.length;
-		  
-		return time;
-	}
+
 	
 	/* Metodo per avviare la fase di atterraggio */
 	private void startDeparture(Runway runway) {
 		if (departureQueue.size() > 0) {
 			Aircraft departureAircraft = departureQueue.removeFirst();
-			log.info("Informing aircraft {} that it can start departure", departureAircraft.getFlightId());
+			if(Parameters.logVerbose) log.info("Informing aircraft {} that it can start departure", departureAircraft.getFlightId());
 			/* Qui va inviato il messaggio per avviare la fase di rullaggio*/
 			departureAircraft.getAircraftActor().tell(new StartTakeOff(runway, departureAircraft.getFlightId()), getSelf());
 			/* Qui va liberato il parcheggio */
-			freeParking(departureAircraft);
+			freeParking(departureAircraft.getFlightId());
 			// La pista va settata occupata
 			runway.setAircraftInRunway(departureAircraft);
 			runway.setStatus("OCCUPIED");
@@ -181,16 +218,35 @@ public class ControlTower extends AbstractActor {
 		runway.setStatus("FREE");
 	}
 	
-	/* Aggiornamento dei tempi in caso di atterraggio d'emergenza */
-	private void informAircrafts () {
-		int i = 0;
-		for (Aircraft a : landingQueue) {
-			if (i == 0)
-				a.getAircraftActor().tell(new UpdateLandingTime(a.getFlightId(), Parameters.averageRunwayOccupation), getSelf());
-			else
-				a.getAircraftActor().tell(new UpdateLandingTime(a.getFlightId(), Parameters.averageRunwayOccupation * i / runways.length), getSelf());
-			i++;
+	/* ========== METODI PER INFORMARE AEREI NELLE CODE SUI TEMPI ========== */	
+	
+	/* Aggiornamento dei tempi di decollo */
+	private void informDepartureAircrafts () {
+		if(Parameters.logVerbose) log.info("Informing departure aircrafts about updated times");
+		for (Aircraft a : departureQueue) {
+			a.getAircraftActor().tell(new UpdateDepartureTime(a.getFlightId(), getTimeForTakingOff(a.getFlightId())), getSelf());
 		}
+		if(Parameters.logVerbose) log.info("Departure aircrafts informed about updated times");
+	}
+	
+	/* Aggiornamento dei tempi di atterraggio */
+	private void informAllAircrafts () {
+		if(Parameters.logVerbose) log.info("Informing aircrafts in emergency about updated times");
+		for (Aircraft a : emergencyLandingQueue) {
+			a.getAircraftActor().tell(new UpdateLandingTime(a.getFlightId(), getTimeForEmergencyLanding(a.getFlightId())), getSelf());
+		}
+		if(Parameters.logVerbose) log.info("Aircrafts in emergency informed about updated times");
+		informLandingDepartureAircrafts();
+	}
+	
+	/* Aggiornamento dei tempi di atterraggio di emergenza */
+	private void informLandingDepartureAircrafts () {
+		if(Parameters.logVerbose) log.info("Informing landing aircrafts about updated times");
+		for (Aircraft a : landingQueue) {
+			a.getAircraftActor().tell(new UpdateLandingTime(a.getFlightId(), getTimeForLanding(a.getFlightId())), getSelf());
+		}
+		if(Parameters.logVerbose) log.info("Landing aircrafts informed about updated times");
+		informDepartureAircrafts();
 	}
 	
 	/* ========== METODI GESTIONE PISTE ========== */	
@@ -206,94 +262,75 @@ public class ControlTower extends AbstractActor {
 	
 	/* Metodo per visualizzare la coda di atterraggio */
 	private void printLandingQueue() {
-		if (landingQueue.size() <= 0) {
-			log.info("No aircrafts in landing queue!");
-		}
-		int i = 0;
-		String message = "";
+		String message;
+		message = "";
 		message += "\n********** LANDING QUEUE **********";
-		for (Aircraft a : landingQueue) {
-			message += "\nPosition" + Integer.toString(i+1) + ": " + a.getFlightId();
-			i++;
+		if (landingQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : landingQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
+			}
 		}
 		message += "\n********** END OF LANDING QUEUE **********";
 		log.info(message);
 	}
 	
+	/* Metodo per visualizzare la coda di atterraggio di emergenza */
+	private void printEmergencyLandingQueue() {
+		String message;
+		message = "";
+		message += "\n********** EMERGENCY LANDING QUEUE **********";
+		if (emergencyLandingQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : emergencyLandingQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
+			}
+		}
+		message += "\n********** END OF EMERGENCY LANDING QUEUE **********";
+		log.info(message);
+	}
+	
 	/* Metodo per visualizzare il parcheggio */
 	private void printParking() {
-		/* QUESTO VA MODIFICATO */
-		if (isParkingEmpty()) {
-			log.info("No aircrafts in parking!");
-			return;
-		} else {
-			String message = "";
-			message += "\n********** PARKING **********";
-			for (int i = 0; i < parking.length; i++) {
-				message += "\n----------";
-				if (parking[i] == null)
-					message += "\n|" + Integer.toString(i+1) + ": EMPTY";
-				else
-					message += "\n|" + Integer.toString(i+1) + ": AIRCRAFT " + parking[i].getFlightId();
-				message += "\n----------";
-			}
-			message += "\n********** END OF PARKING **********";
-			log.info(message);
+		String message;
+		message = "";
+		message += "\n********** PARKING **********";
+		if (parking.size() <= 0) {
+			message+="\nEmpty";
 		}
-	}
-	
-	/* Metodo per controllare se ci sono posti liberi nel parcheggio */
-	private boolean isThereFreeParking() {
-		for (int i = 0; i < parking.length; i++) {
-			if (parking[i] == null)
-				return true;
-		}
-		return false;
-	}
-	
-	/* Metodo per controllare se il parcheggio � vuoto */
-	private boolean isParkingEmpty() {
-		for (int i = 0; i < parking.length; i++) {
-			if (parking[i] != null)
-				return false;
-		}
-		return true;
-	}
-	
-	/* Metodo per liberare il posto occupato da Aircraft nel parcheggio */
-	private void freeParking(Aircraft a) {
-		if (a.getEmergencyState()) {
-			for (int i = 0; i < emergencyParking.length; i++) {
-				if (emergencyParking[i] == null)
-					continue;
-				if (emergencyParking[i].getFlightId().equals(a.getFlightId())) {
-					emergencyParking[i] = null;
-					return;
-				}
-			}
-		} else {
-			for (int i = 0; i < parking.length; i++) {
-				if (parking[i] == null)
-					continue;
-				if (parking[i].getFlightId().equals(a.getFlightId())) {
-					parking[i] = null;
-					return;
-				}
+		else {
+			int i = 0;
+			for (Aircraft a : parking) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
 			}
 		}
+		message += "\n********** END OF PARKING **********";
+		log.info(message);
 	}
 	
 	/* Metodo per visualizzare la coda di partenza */
 	private void printDepartureQueue() {
-		if (departureQueue.size() <= 0) {
-			log.info("No aircrafts in departure queue!");
-		}
-		int i = 0;
-		String message = "";
+		String message;
+		message = "";
 		message += "\n********** DEPARTURE QUEUE **********";
-		for (Aircraft a : departureQueue) {
-			message += "\nPosition" + Integer.toString(i+1) + ": " + a.getFlightId();
-			i++;
+		if (departureQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : departureQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
+			}
 		}
 		message += "\n********** END OF DEPARTURE QUEUE **********";
 		log.info(message);
@@ -306,9 +343,96 @@ public class ControlTower extends AbstractActor {
 		
 		for (int i = 0; i < runways.length; i++) {
 			message += "\nRunway " + Integer.toString(i+1) + ": " + runways[i].getStatus();
+			if (!runways[i].isFree())
+				message+= " by " + runways[i].getAircraftInRunway().getFlightId();
 		}
 		
 		message += "\n********** END OF RUNWAYS STATE **********";
+		log.info(message);
+	}
+	
+	private void printAirportState() {
+		String message;
+		message = "";
+		
+		message += "\n********** NUMBER OF AIRCRAFTS **********";
+		message += "\n" + numberOfAircrafts;
+		
+		message += "\n********** EMERGENCY LANDING QUEUE **********";
+		if (emergencyLandingQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : emergencyLandingQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForEmergencyLanding(a.getFlightId());
+				i++;
+			}
+		}
+		//message += "\n********** END OF EMERGENCY LANDING QUEUE **********";
+		
+		message += "\n********** LANDING QUEUE **********";
+		if (landingQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : landingQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForLanding(a.getFlightId());
+				i++;
+			}
+		}
+		//message += "\n********** END OF LANDING QUEUE **********";
+		
+		message += "\n********** RUNWAYS STATE **********";
+		for (int i = 0; i < runways.length; i++) {
+			message += "\nRunway " + Integer.toString(i+1) + ": " + runways[i].getStatus();
+			if (!runways[i].isFree())
+				message+= " by " + runways[i].getAircraftInRunway().getFlightId();
+		}
+		//message += "\n********** END OF RUNWAYS STATE **********";
+		
+		message += "\n********** EMERGENCY PARKING **********";
+		if (emergencyParking.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : emergencyParking) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
+			}
+		}
+		//message += "\n********** END OF EMERGENCY PARKING **********";
+		
+		message += "\n********** PARKING **********";
+		if (parking.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : parking) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId();
+				i++;
+			}
+		}
+		//message += "\n********** END OF PARKING **********";
+		
+		message += "\n********** DEPARTURE QUEUE **********";
+		if (departureQueue.size() <= 0) {
+			message+="\nEmpty";
+		}
+		else {
+			int i = 0;
+			for (Aircraft a : departureQueue) {
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForTakingOff(a.getFlightId());
+				i++;
+			}
+		}
+		//message += "\n********** END OF DEPARTURE QUEUE **********";
+		
+		message += "\n********************************************";
+		
 		log.info(message);
 	}
 	
@@ -321,129 +445,171 @@ public class ControlTower extends AbstractActor {
 			.match(
 	        	LandingRequest.class,
 	            r -> {
-	            	if (isThereFreeParking()) {
+	            	if(Parameters.logVerbose) log.info("Landing request received from aircraft {}", r.flightId);
+	            	if ( numberOfAircrafts < Parameters.parkingSize ) {
 	            		ActorRef sender = getSender();
-		            	long timeForLanding = getTimeForLanding(sender);
-	            		landingQueue.add(new Aircraft(r.flightId,getSender(),false));
+		            	landingQueue.add(new Aircraft(r.flightId,getSender(),false));
+	            		++numberOfAircrafts; //incremento numero di aerei nell'aeroporto
+		            	long timeForLanding = getTimeForLanding(r.flightId);
 		            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
-		            	log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
+		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
 		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
-		            	printRunways();
-		            	Runway freeRunway = getFreeRunway();
-		            	if (freeRunway != null)
-		            		startLanding(freeRunway);
+		            	//printRunways();
+		            	//Runway freeRunway = getFreeRunway();
+		            	//if (freeRunway != null)
+		            	//	startLanding(freeRunway);
+		            	if(Parameters.logAirportState) printAirportState();
 	            	} else {
-	            		log.info("Parking is full! Landing denial for aircraft {}", r.flightId);
+	            		if(Parameters.logVerbose) log.info("The airport is full! Landing denial for aircraft {}", r.flightId);
 		            	getSender().tell(new LandingDenial(r.flightId), getSelf());
-	            	}	            	
+	            	}	       
 	            })
 	        .match(
 		        EmergencyLandingRequest.class,
 	            r -> {
+	            	if(Parameters.logVerbose) log.info("Emergency landing request received from aircraft {}", r.flightId);
 	            	ActorRef sender = getSender();
-            		emergencyLandingQueue.add(new Aircraft(r.flightId,getSender(),true));
-	            	sender.tell(new RespondLandingTime(r.flightId, 0), getSelf());
-	            	log.info("Control tower {} computed 0 seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, r.flightId);
+	            	emergencyLandingQueue.add(new Aircraft(r.flightId,getSender(),true));
+            		++numberOfAircrafts; //incremento numero di aerei nell'aeroporto
+	            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);
+	            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
+	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, r.flightId);
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	printRunways();
-	            	Runway freeRunway = getFreeRunway();
-	            	if (freeRunway != null)
-	            		startLanding(freeRunway);
+	            	//printRunways();
+	            	//Runway freeRunway = getFreeRunway();
+	            	//if (freeRunway != null)
+	            	//	startLanding(freeRunway);
+	            	if(Parameters.logAirportState) printAirportState();
             })
 	        /* ========== CONFERME ATTERRAGGIO ========== */
 	        .match(
 	        	LandingConfirmation.class,
 		            r -> {
 		            	if(r.value) {
-		            		if (r.confirmationType == 1) {
-			            		log.info("Aircraft {} accepted to land", r.flightId);
-			            		printLandingQueue(); // metodo di debug
-		            		}
+		            		if(Parameters.logVerbose) log.info("Aircraft {} accepted to land", r.flightId);
+			            	informDepartureAircrafts();
+			            	//printLandingQueue(); // metodo di debug
 		            	}
 		            	else {
-		            		log.info("Aircraft {} changed course. It is now directed to another airport", r.flightId);
+		            		if(Parameters.logVerbose) log.info("Aircraft {} changed course. It is now directed to another airport", r.flightId);
 		            		deleteAircraft(r.flightId);
-		            		printLandingQueue(); // metodo di debug
+		            		--numberOfAircrafts;
+		            		if(Parameters.logAirportState) printAirportState();
+		            		//printLandingQueue(); // metodo di debug
 		            	}
+		            	
 		            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-		            	printRunways();
+		            	//printRunways();
 		            	Runway freeRunway = getFreeRunway();
-		            	if (freeRunway != null)
+		            	if (freeRunway != null) {
 		            		startLanding(freeRunway);
+		            		if(Parameters.logAirportState) printAirportState();
+		            	}
 		            })	        
 	        .match(
         		EmergencyLandingConfirmation.class,
 	            r -> {
 	            	if(r.value) {
-	            		if (r.confirmationType == 1) {
-		            		log.info("EMERGENCY LANDING for aircraft {} confirmed", r.flightId);
-		            		informAircrafts();
-		            		printLandingQueue(); // metodo di debug
-	            		}
+	            		if(Parameters.logVerbose) log.info("EMERGENCY LANDING for aircraft {} confirmed", r.flightId);
+	            		informLandingDepartureAircrafts();
+	            		//printEmergencyLandingQueue(); // metodo di debug
 	            	}
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	printRunways();
+	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
-	            	if (freeRunway != null)
+	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
+	            		if(Parameters.logAirportState) printAirportState();
+	            	}
+	            })
+	        /* ========== AEREO DIVENTATO IN EMERGENZA ========== */
+	        .match(
+        		NowInEmergency.class,
+	            r -> {
+	            	if(Parameters.logVerbose) log.info("Aircraft {} is now in emergency state", r.flightId);
+	            	ActorRef sender = getSender();
+	            	//rimuovo l'aereo dalla coda di atterraggio (con emergency state false) e lo aggiungo alla coda di emergenza (con emergency state true)
+	            	deleteAircraft(r.flightId);
+	            	emergencyLandingQueue.add(new Aircraft(r.flightId,getSender(),true));
+	            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);	            	
+	            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
+	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, r.flightId);
+	            	
+	            	if(Parameters.logAirportState) printAirportState();
+	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
+	            	//printRunways();
+	            	//Runway freeRunway = getFreeRunway();
+	            	//if (freeRunway != null)
+	            	//	startLanding(freeRunway);
 	            })
 	        /* ========== ATTERRAGGIO ========== */
 	        .match(
         		Landing.class,
 	            r -> {
-	            	log.info("Aircraft {} is now landing in runway {}", r.flightId, r.runway.getRunwayNumber());
+	            	if(Parameters.logVerbose) log.info("Aircraft {} is now landing in runway {}", r.flightId, r.runway.getRunwayNumber());
 	            })
 	        /* ========== CHIUSURA FASE ATTERRAGGIO ========== */
 	        .match(
         		LandingComplete.class,
 	            r -> {
-	            	log.info("Aircraft {}: LANDED", r.flightId);
+	            	if(Parameters.logVerbose) log.info("Aircraft {}: LANDED", r.flightId);
 	            	closeLandingPhase(r.runway.getAircraftInRunway(), r.runway);
-	            	printParking();
+	            	//printParking();
+	            	if(Parameters.logAirportState) printAirportState();
 	            	/* Aggiorno tutti gli aerei in coda sugli orari di atterraggio */
-	            	informAircrafts();
+	            	informAllAircrafts();
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	printRunways();
+	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
-	            	if (freeRunway != null)
+	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
+	            		if(Parameters.logAirportState) printAirportState();
+	            	}
 	            })
 	        /* ========== RICHIESTE DECOLLO ========== */
 			.match(
 				DepartureRequest.class,
 	            r -> {
+	            	if(Parameters.logVerbose) log.info("Departure request received from aircraft {}", r.flightId);
 	            	ActorRef sender = getSender();
-	            	long timeForDeparture = getTimeForTakingOff(sender);
-            		departureQueue.add(new Aircraft(r.flightId,getSender(),r.inEmergency));
+	            	departureQueue.add(new Aircraft(r.flightId,getSender(),r.inEmergency));
+	            	long timeForDeparture = getTimeForTakingOff(r.flightId);
 	            	sender.tell(new RespondDepartureTime(r.flightId, timeForDeparture), getSelf());
-	            	log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
-	            	printDepartureQueue();
+	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
+	            	//printDepartureQueue();
+	            	if(Parameters.logAirportState) printAirportState();
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	printRunways();
+	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
-	            	if (freeRunway != null)
+	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
+	            		if(Parameters.logAirportState) printAirportState();
+	            	}
 	            })
 	        /* ========== DECOLLO ========== */
 	        .match(
         		TakingOff.class,
 	            r -> {
-	            	log.info("Aircraft {} is now taking off from runway {}", r.flightId, r.runway.getRunwayNumber());
+	            	if(Parameters.logVerbose) log.info("Aircraft {} is now taking off from runway {}", r.flightId, r.runway.getRunwayNumber());
 	            })
 	        /* ========== CHIUSURA FASE DECOLLO ========== */
 	        .match(
         		TakeOffComplete.class,
 	            r -> {
-	            	log.info("Aircraft {}: DEPARTED", r.flightId);
+	            	if(Parameters.logVerbose) log.info("Aircraft {}: DEPARTED", r.flightId);
 	            	closeDeparturePhase(r.runway);
-	            	printParking();
+	            	--numberOfAircrafts;
+	            	//printParking();
+	            	if(Parameters.logAirportState) printAirportState();
 	            	/* Aggiorno tutti gli aerei in coda sugli orari di atterraggio */
-	            	informAircrafts();
+	            	informAllAircrafts();
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	printRunways();
+	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
-	            	if (freeRunway != null)
+	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
+	            		if(Parameters.logAirportState) printAirportState();
+	            	}
 	            })
 	        .build();	    
 	  }

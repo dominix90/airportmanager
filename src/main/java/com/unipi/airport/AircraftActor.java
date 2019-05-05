@@ -8,6 +8,7 @@ import java.time.Duration;
 
 import org.apache.commons.math3.distribution.*;
 
+import com.unipi.utils.Parameters;
 import com.unipi.utils.Messages.*;
 
 public class AircraftActor extends AbstractActor {
@@ -18,6 +19,7 @@ public class AircraftActor extends AbstractActor {
   private boolean inEmergency;
   private Scheduler scheduler = getContext().getSystem().getScheduler();
   private Cancellable fuelScheduling;
+  private long previousFuelCheckTime;
   private ActorRef controlTower;
 
   public AircraftActor(String flightId, long fuel, boolean inEmergency) {
@@ -33,14 +35,17 @@ public class AircraftActor extends AbstractActor {
 
   @Override
   public void preStart() {
-	  log.info("Aircraft actor {} started", flightId);
-	  /* Viene schedulato un messaggio da ricevere per il consumo di carburante */
-	  fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId), getContext().getSystem().dispatcher(), null);
+	  if(Parameters.logVerbose) log.info("Aircraft actor {} started", flightId);
+	  /* Viene schedulato un messaggio da ricevere per il consumo di carburante se l'aereo non è in emergenza */
+	  if(!inEmergency) {
+	  	fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId), getContext().getSystem().dispatcher(), null);
+	  	previousFuelCheckTime = System.currentTimeMillis();
+	  }
   }
 
   @Override
   public void postStop() {
-    log.info("Aircraft actor {} stopped", flightId);
+	  if(Parameters.logVerbose) log.info("Aircraft actor {} stopped", flightId);
   }
   
   public String getFlightId() {
@@ -63,7 +68,7 @@ public class AircraftActor extends AbstractActor {
 		time = lnd.sample();
 		
 		return time * 1000;
-	}
+  }
   
   /* Metodo per ottenimento durata parcheggio */
   public double getParkingOccupation() {
@@ -83,31 +88,35 @@ public class AircraftActor extends AbstractActor {
 			FuelReserve.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
+            		long actualFuelCheckTime = System.currentTimeMillis();
+            		long consumedFuel = actualFuelCheckTime - previousFuelCheckTime;
+            		previousFuelCheckTime = actualFuelCheckTime;
+            		fuel = fuel - consumedFuel;
             		if (fuel <= 0) {
             			/* Se il carburante � non positivo allora l'aereo usa il carburante d'emergenza 
-            			 * per raggiungere un altro aeroporto. Nel momento in cui la torre di 
-            			 * controllo da il via all'atterraggio il timer viene annullato 
+            			 * e diventa in stato di emergenza.
+            			 * Il timer viene annullato.
             			 */
+            			inEmergency = true;
+            			fuelScheduling.cancel();
 	            		if (controlTower != null)
-	            			controlTower.tell(new LandingConfirmation(false, flightId, 1), getSelf());
-	            		getContext().stop(getSelf());
+	            			controlTower.tell(new NowInEmergency(flightId), getSelf());
             		} else {
             			/* Viene schedulato un messaggio da ricevere per il consumo di carburante */
-            			fuel = fuel - 1000;
             			fuelScheduling = scheduler.scheduleOnce(Duration.ofMillis(1000), getSelf(), new FuelReserve(flightId), getContext().getSystem().dispatcher(), null);
             		}
             	}
             })	
     	/* ========== RICHIESTA DI ATTERRAGGIO ========== */
 		.match(
-			StartLandingPhase.class,
+			StartLandingRequest.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		if (inEmergency)
             			getSender().tell(new EmergencyLandingRequest(flightId), getSelf());
             		else
             			getSender().tell(new LandingRequest(flightId), getSelf());
-	            	log.info("Landing request by aircraft {} to control tower", this.flightId);  
+            		if(Parameters.logVerbose) log.info("Landing request by aircraft {} to control tower", this.flightId);  
 	            	controlTower = r.controlTower;
             	}
             })
@@ -124,42 +133,44 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		if (inEmergency) {
-            			getSender().tell(new EmergencyLandingConfirmation(true, flightId, 1), getSelf());
-            			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            			getSender().tell(new EmergencyLandingConfirmation(true, flightId), getSelf());
+            			if(Parameters.logVerbose) log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
             		}
             		else {
             			boolean landingConfirmation = sufficientFuel(r.timeForLanding);
-            			getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 1), getSelf());
-		      			log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
+            			getSender().tell(new LandingConfirmation(landingConfirmation, flightId), getSelf());
+            			if(Parameters.logVerbose) log.info("Landing confirmation sent by aircraft {} to control tower", this.flightId);
 		      			if (!landingConfirmation)
 		      				getContext().stop(getSelf());
             		}
             	}
             })
         .match(
-    		UpdateLandingTime.class,
+    		UpdateLandingTime.class, //da modificare, deve essere sincrono
             r -> {
             	if (this.flightId.equals(r.flightId)) {            		
-            		if (inEmergency) {
-            			getSender().tell(new EmergencyLandingConfirmation(true, flightId, 2), getSelf());
-            			log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
-            		}
-            		else {
-            			boolean landingConfirmation = sufficientFuel(r.timeForLanding);
-            			getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 2), getSelf());	            	
-		            	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
-		            	if (!landingConfirmation)
-		      				getContext().stop(getSelf());
-            		}
+            		//if (inEmergency) {
+            		//	getSender().tell(new EmergencyLandingConfirmation(true, flightId, 2), getSelf());
+            		//	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
+            		//}
+            		//else {
+            		//	boolean landingConfirmation = sufficientFuel(r.timeForLanding);
+		            //	if (!landingConfirmation) {
+		            //		getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 2), getSelf());	            	
+		            //		log.info("Landing canceled by aircraft {} after landing queue update", this.flightId);
+		      		//		getContext().stop(getSelf());
+		            //	}
+            		//}
             	}
             })
-        /* ========== INIZIO FASE DI ATTERRAGGIO ========== */
+        /* ========== INIZIO ATTERRAGGIO ========== */
         .match(
     		StartLanding.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		/* Viene annullato il timer di consumo carburante */
-            		fuelScheduling.cancel();
+            		/* Viene annullato il timer di consumo carburante se ancora attivo */
+            		if (!inEmergency)	
+            			fuelScheduling.cancel();
             		getSender().tell(new Landing(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere alla fine dell'atterraggio */
             		long runwayOccupation = Math.round(getRunwayOccupation());
@@ -182,7 +193,7 @@ public class AircraftActor extends AbstractActor {
             r -> {
             	if (this.flightId.equals(r.flightId)) {
             		r.controlTower.tell(new DepartureRequest(r.flightId,inEmergency), getSelf());
-	            	log.info("Aircraft {} requested departure", this.flightId);
+            		if(Parameters.logVerbose) log.info("Aircraft {} requested departure", this.flightId);
             	}
             })
         /* ========== TEMPI DI DECOLLO ========== */

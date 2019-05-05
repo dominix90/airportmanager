@@ -81,12 +81,10 @@ public class Messages {
 	public static final class EmergencyLandingConfirmation {
 		  public final boolean value;
 		  public final String flightId;
-			public final int confirmationType; // 1 --> prima richiesta; 2 --> risposta ad aggiornamento code
 
-		  public EmergencyLandingConfirmation(boolean value, String flightId, int confirmationType) {
+		  public EmergencyLandingConfirmation(boolean value, String flightId) {
 			  this.value = value;
 			  this.flightId = flightId;
-				this.confirmationType = confirmationType;
 		  }
 	  }
 	  
@@ -97,12 +95,10 @@ public class Messages {
 	public static final class LandingConfirmation {
 		public final boolean value;
 		public final String flightId;
-		public final int confirmationType; // 1 --> prima richiesta; 2 --> risposta ad aggiornamento code
 
-		public LandingConfirmation(boolean value, String flightId, int confirmationType) {
+		public LandingConfirmation(boolean value, String flightId) {
 			this.value = value;
 			this.flightId = flightId;
-			this.confirmationType = confirmationType;
 		}
 	}
 	
@@ -302,11 +298,11 @@ public class Messages {
 	 * DESTINATION: Aircraft
 	 * MESSAGE: Puoi richiedere l'atterraggio.
 	 */
-	public static final class StartLandingPhase {
+	public static final class StartLandingRequest {
 		public final ActorRef controlTower;
 		public final String flightId;
 
-		  public StartLandingPhase(ActorRef controlTower, String flightId) {
+		  public StartLandingRequest(ActorRef controlTower, String flightId) {
 			  this.controlTower = controlTower;
 			  this.flightId = flightId;
 		  }
@@ -318,12 +314,24 @@ public class Messages {
 	
 	/* SOURCE: Aircraft
 	 * DESTINATION: Aircraft
-	 * MESSAGE: Carburante in riserva.
+	 * MESSAGE: Controlla la riserva di carburante.
 	 */
 	public static final class FuelReserve {
 		public final String flightId;
 
 		public FuelReserve(String flightId) {
+			this.flightId = flightId;
+		}
+	}
+	
+	/* SOURCE: Aircraft
+	 * DESTINATION: Control Tower
+	 * MESSAGE: Sono in stato di emergenza adesso.
+	 */
+	public static final class NowInEmergency {
+		public final String flightId;
+
+		public NowInEmergency(String flightId) {
 			this.flightId = flightId;
 		}
 	}

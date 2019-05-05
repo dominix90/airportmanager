@@ -32,7 +32,7 @@ public class AirportSupervisor extends AbstractActor {
     	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());
     	double nextArrival = getTimeForNextArrival();
     	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);
-    	log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
+    	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
     	
     	/* DEBUG */
 		/*
@@ -51,7 +51,7 @@ public class AirportSupervisor extends AbstractActor {
 	    
 	    /* Viene generato il primo aereo e schedulato 
 	     * il selfmessage per la generazione del traffico di volo */
-	    aircraft.tell(new StartLandingPhase(controlTower, flightId), controlTower);
+	    aircraft.tell(new StartLandingRequest(controlTower, flightId), controlTower);
 	}
 
 	@Override
@@ -90,7 +90,7 @@ public class AirportSupervisor extends AbstractActor {
 	public double getTimeForNextArrival() {
 		double time = 0.000;
 		
-		ExponentialDistribution exp = new ExponentialDistribution(10.000);
+		ExponentialDistribution exp = new ExponentialDistribution(1.000);
 		time = exp.sample();
 		
 		return time * 1000;
@@ -100,7 +100,7 @@ public class AirportSupervisor extends AbstractActor {
 	public double getFuelValue() {
 		double fuel = 0.000;
 		
-		UniformRealDistribution ud = new UniformRealDistribution(0,10);
+		UniformRealDistribution ud = new UniformRealDistribution(0,100);
 		fuel = ud.sample();
 		
 		return fuel * 1000;
@@ -126,9 +126,9 @@ public class AirportSupervisor extends AbstractActor {
 	            	String flightId = generateFlightId(6);
 	            	double nextArrival = getTimeForNextArrival();
 	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());	
-	            	newAircraft.tell(new StartLandingPhase(controlTower, flightId), controlTower);
+	            	newAircraft.tell(new StartLandingRequest(controlTower, flightId), controlTower);
 	            	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);	            	
-	            	log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
+	            	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
 	            })
 	        .build();
 	}
