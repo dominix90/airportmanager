@@ -14,7 +14,17 @@ public class AirportSupervisor extends AbstractActor {
 	
 	private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
 	private Scheduler scheduler = getContext().getSystem().getScheduler();
+	//PARAMETRI PER GENERAZIONE flighId
 	private int sequenceNumber = 0;
+	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};
+	private static final String NUMERIC_STRING = "0123456789";
+	//DISTRIBUZIONI
+	private ExponentialDistribution interArrivalTimeDistribution;
+	private UniformRealDistribution fuelDistribution;
+	private UniformRealDistribution emergencyDistribution;
+	private LogNormalDistribution landingTimeDistribution;
+	private LogNormalDistribution takeOffTimeDistribution;
+	private LogNormalDistribution parkingTimeDistribution;
 
 	public static Props props() {
 		return Props.create(AirportSupervisor.class);
@@ -27,12 +37,34 @@ public class AirportSupervisor extends AbstractActor {
 	public void preStart() {
 		log.info("Airport Application started");
 		
+		//DISTRIBUZIONI
+		interArrivalTimeDistribution = new ExponentialDistribution(Parameters.meanInterArrivalTime);
+		interArrivalTimeDistribution.reseedRandomGenerator(Parameters.seed);
+		fuelDistribution = new UniformRealDistribution(Parameters.minFuel,Parameters.maxFuel);
+		fuelDistribution.reseedRandomGenerator(Parameters.seed);
+		emergencyDistribution = new UniformRealDistribution(0,100);
+		emergencyDistribution.reseedRandomGenerator(Parameters.seed);
+		landingTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanLandingTime), Parameters.shapeLandingTime);
+		landingTimeDistribution.reseedRandomGenerator(Parameters.seed);
+		takeOffTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanTakeOffTime), Parameters.shapeTakeOffTime);
+		takeOffTimeDistribution.reseedRandomGenerator(Parameters.seed+1000);
+		parkingTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanParkingTime), Parameters.shapeParkingTime);
+		parkingTimeDistribution.reseedRandomGenerator(Parameters.seed+2000);
+		
+		
 		//AEREO INIZIALE
 		String flightId = generateFlightId(6);
-    	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());
-    	double nextArrival = getTimeForNextArrival();
+    	
+    	double nextArrival = interArrivalTimeDistribution.sample();
+    	double fuel = fuelDistribution.sample();
+    	boolean emergencyState = getEmergencyState(emergencyDistribution.sample());
+    	double landingTime = landingTimeDistribution.sample();
+    	double takeOffTime = takeOffTimeDistribution.sample();
+    	double parkingTime = parkingTimeDistribution.sample();
+    	
+    	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(fuel), emergencyState, landingTime, takeOffTime, parkingTime), flightId.toLowerCase());
     	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);
-    	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
+    	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} {}", flightId, nextArrival, Parameters.timeUnit);
     	
     	/* DEBUG */
 		/*
@@ -58,13 +90,9 @@ public class AirportSupervisor extends AbstractActor {
 	public void postStop() {
 		log.info("Airport Application stopped");
 	}
-	
-	/* Generazione del flightId */
-	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};
-	private static final String NUMERIC_STRING = "0123456789";
 
+	//metodo per generare flighId
 	public String generateFlightId(int count) {
-		
 		StringBuilder builder = new StringBuilder();
 		builder.append(sequenceNumber);
 		builder.append("-");
@@ -86,29 +114,10 @@ public class AirportSupervisor extends AbstractActor {
 		return builder.toString();
 	}
 	
-	/* Generazione del timeForNextArrival */
-	public double getTimeForNextArrival() {
-		double time = 0.000;
-		
-		ExponentialDistribution exp = new ExponentialDistribution(1.000);
-		time = exp.sample();
-		
-		return time * 1000;
-	}
-	
-	/* Generazione del valore carburante */
-	public double getFuelValue() {
-		double fuel = 0.000;
-		
-		UniformRealDistribution ud = new UniformRealDistribution(0,100);
-		fuel = ud.sample();
-		
-		return fuel * 1000;
-	}
 	
 	/* Generazione del boolean inEmergency */
-	public boolean getEmergencyState() {
-		if (new UniformRealDistribution(0,100).sample() >= 95)
+	public boolean getEmergencyState(double emergencyDistSample) {
+		if ( emergencyDistSample < Parameters.emergencyPercentage )
 			return true;
 		return false;
 	}
@@ -124,8 +133,14 @@ public class AirportSupervisor extends AbstractActor {
 	            r -> {
 	            	sequenceNumber++;
 	            	String flightId = generateFlightId(6);
-	            	double nextArrival = getTimeForNextArrival();
-	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(getFuelValue()), getEmergencyState()), flightId.toLowerCase());	
+	            	double nextArrival = interArrivalTimeDistribution.sample();
+	            	double fuel = fuelDistribution.sample();
+	            	boolean emergencyState = getEmergencyState(emergencyDistribution.sample());
+	            	double landingTime = landingTimeDistribution.sample();
+	            	double takeOffTime = takeOffTimeDistribution.sample();
+	            	double parkingTime = parkingTimeDistribution.sample();
+	            	
+	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(fuel), emergencyState, landingTime, takeOffTime, parkingTime), flightId.toLowerCase());	
 	            	newAircraft.tell(new StartLandingRequest(controlTower, flightId), controlTower);
 	            	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);	            	
 	            	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);

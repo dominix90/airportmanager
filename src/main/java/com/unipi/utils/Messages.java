@@ -336,4 +336,16 @@ public class Messages {
 		}
 	}
 	
+	/* SOURCE: Control Tower
+	 * DESTINATION: Aircraft
+	 * MESSAGE: Non sei più in emergenza
+	 */
+	public static final class YouAreNotInEmergency {
+		public final String flightId;
+
+		public YouAreNotInEmergency(String flightId) {
+			  this.flightId = flightId;
+		  }
+	  }
+	
 }

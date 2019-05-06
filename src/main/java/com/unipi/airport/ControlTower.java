@@ -66,8 +66,8 @@ public class ControlTower extends AbstractActor {
 			}
 		}
 		
-		int queueSize = flightIndex + emergencyLandingQueue.size();
-		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
+		int landingQueueSize = flightIndex + emergencyLandingQueue.size();
+		time = Math.round(Parameters.meanLandingTime) * (landingQueueSize+RO) / runways.length;
 		  
 		return time;
 	}
@@ -89,7 +89,7 @@ public class ControlTower extends AbstractActor {
 		}
 		
 		int queueSize = flightIndex;
-		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
+		time = Math.round(Parameters.meanLandingTime) * (queueSize+RO) / runways.length;
 		  
 		return time;
 	}
@@ -110,8 +110,9 @@ public class ControlTower extends AbstractActor {
 			}
 		}
 		
-		int queueSize = landingQueue.size() + emergencyLandingQueue.size() + flightIndex;
-		time = Parameters.averageRunwayOccupation * (queueSize+RO) / runways.length;
+		int landingQueueSize = landingQueue.size() + emergencyLandingQueue.size();
+		int departureQueueSize = flightIndex;
+		time = ( (Math.round(Parameters.meanTakeOffTime)*departureQueueSize) + (Math.round(Parameters.meanLandingTime)*(landingQueueSize+RO)) ) / runways.length;
 		  
 		return time;
 	}
@@ -121,7 +122,7 @@ public class ControlTower extends AbstractActor {
 	/* Metodo per la gestione dei casi in cui un aereo decide di abbandonare 
 	 * la coda di atterraggio
 	 */
-	private void deleteAircraft(String flightId) {
+	private boolean deleteAircraft(String flightId) {
 		/*
 		 * for( Aircraft a : emergencyLandingQueue ) { if(a.getFlightId()==flightId) {
 		 * emergencyLandingQueue.remove(a); return; } }
@@ -130,9 +131,10 @@ public class ControlTower extends AbstractActor {
 		for( Aircraft a : landingQueue ) {
 			if(a.getFlightId()==flightId) {
 				landingQueue.remove(a);
-				return;
+				return true;
 			}
 		}
+		return false;
 	}
 	
 	/* Metodo per liberare il posto occupato da Aircraft nel parcheggio */
@@ -365,7 +367,7 @@ public class ControlTower extends AbstractActor {
 		else {
 			int i = 0;
 			for (Aircraft a : emergencyLandingQueue) {
-				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForEmergencyLanding(a.getFlightId());
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForEmergencyLanding(a.getFlightId()) + " " + Parameters.timeUnit;
 				i++;
 			}
 		}
@@ -378,7 +380,7 @@ public class ControlTower extends AbstractActor {
 		else {
 			int i = 0;
 			for (Aircraft a : landingQueue) {
-				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForLanding(a.getFlightId());
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForLanding(a.getFlightId()) + " " + Parameters.timeUnit;
 				i++;
 			}
 		}
@@ -425,7 +427,7 @@ public class ControlTower extends AbstractActor {
 		else {
 			int i = 0;
 			for (Aircraft a : departureQueue) {
-				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForTakingOff(a.getFlightId());
+				message += "\nPosition" + Integer.toString(i + 1) + ": " + a.getFlightId() + " : " + getTimeForTakingOff(a.getFlightId()) + " " + Parameters.timeUnit;
 				i++;
 			}
 		}
@@ -452,13 +454,13 @@ public class ControlTower extends AbstractActor {
 	            		++numberOfAircrafts; //incremento numero di aerei nell'aeroporto
 		            	long timeForLanding = getTimeForLanding(r.flightId);
 		            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
-		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds for aircraft {} landing", this.airportId, timeForLanding, r.flightId);
+		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} for aircraft {} landing", this.airportId, timeForLanding, Parameters.timeUnit, r.flightId);
 		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 		            	//printRunways();
 		            	//Runway freeRunway = getFreeRunway();
 		            	//if (freeRunway != null)
 		            	//	startLanding(freeRunway);
-		            	if(Parameters.logAirportState) printAirportState();
+		            	//if(Parameters.logAirportState) printAirportState();
 	            	} else {
 	            		if(Parameters.logVerbose) log.info("The airport is full! Landing denial for aircraft {}", r.flightId);
 		            	getSender().tell(new LandingDenial(r.flightId), getSelf());
@@ -473,13 +475,13 @@ public class ControlTower extends AbstractActor {
             		++numberOfAircrafts; //incremento numero di aerei nell'aeroporto
 	            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);
 	            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
-	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, r.flightId);
+	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, Parameters.timeUnit, r.flightId);
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
 	            	//printRunways();
 	            	//Runway freeRunway = getFreeRunway();
 	            	//if (freeRunway != null)
 	            	//	startLanding(freeRunway);
-	            	if(Parameters.logAirportState) printAirportState();
+	            	//if(Parameters.logAirportState) printAirportState();
             })
 	        /* ========== CONFERME ATTERRAGGIO ========== */
 	        .match(
@@ -488,13 +490,14 @@ public class ControlTower extends AbstractActor {
 		            	if(r.value) {
 		            		if(Parameters.logVerbose) log.info("Aircraft {} accepted to land", r.flightId);
 			            	informDepartureAircrafts();
+			            	if(Parameters.logAirportState) printAirportState();
 			            	//printLandingQueue(); // metodo di debug
 		            	}
 		            	else {
 		            		if(Parameters.logVerbose) log.info("Aircraft {} changed course. It is now directed to another airport", r.flightId);
 		            		deleteAircraft(r.flightId);
 		            		--numberOfAircrafts;
-		            		if(Parameters.logAirportState) printAirportState();
+		            		//if(Parameters.logAirportState) printAirportState();
 		            		//printLandingQueue(); // metodo di debug
 		            	}
 		            	
@@ -512,6 +515,7 @@ public class ControlTower extends AbstractActor {
 	            	if(r.value) {
 	            		if(Parameters.logVerbose) log.info("EMERGENCY LANDING for aircraft {} confirmed", r.flightId);
 	            		informLandingDepartureAircrafts();
+	            		if(Parameters.logAirportState) printAirportState();
 	            		//printEmergencyLandingQueue(); // metodo di debug
 	            	}
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
@@ -529,18 +533,29 @@ public class ControlTower extends AbstractActor {
 	            	if(Parameters.logVerbose) log.info("Aircraft {} is now in emergency state", r.flightId);
 	            	ActorRef sender = getSender();
 	            	//rimuovo l'aereo dalla coda di atterraggio (con emergency state false) e lo aggiungo alla coda di emergenza (con emergency state true)
-	            	deleteAircraft(r.flightId);
-	            	emergencyLandingQueue.add(new Aircraft(r.flightId,getSender(),true));
-	            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);	            	
-	            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
-	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, r.flightId);
+	            	if( deleteAircraft(r.flightId) ) {
+	            		//se l'aereo è nella coda di atterraggio lo sposto in quella di emergenza
+		            	emergencyLandingQueue.add(new Aircraft(r.flightId,getSender(),true));
+		            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);	            	
+		            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
+		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, Parameters.timeUnit, r.flightId);
+		            	
+		            	if(Parameters.logAirportState) printAirportState();
+		            	
+		            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
+		            	//printRunways();
+		            	//Runway freeRunway = getFreeRunway();
+		            	//if (freeRunway != null) {
+		            	//	startLanding(freeRunway);
+		            	//	if(Parameters.logAirportState) printAirportState();
+		            	//}
+	            	}
+	            	else {
+	            		//altrimenti significa che l'aereo sta atterrando, quindi lo informo che non è in emergenza
+	            		if(Parameters.logVerbose) log.info("Aircraft {} is already landing and it is not in emergency", r.flightId);
+	            		sender.tell(new YouAreNotInEmergency(r.flightId), getSelf());
+	            	}
 	            	
-	            	if(Parameters.logAirportState) printAirportState();
-	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	//printRunways();
-	            	//Runway freeRunway = getFreeRunway();
-	            	//if (freeRunway != null)
-	            	//	startLanding(freeRunway);
 	            })
 	        /* ========== ATTERRAGGIO ========== */
 	        .match(
@@ -575,7 +590,7 @@ public class ControlTower extends AbstractActor {
 	            	departureQueue.add(new Aircraft(r.flightId,getSender(),r.inEmergency));
 	            	long timeForDeparture = getTimeForTakingOff(r.flightId);
 	            	sender.tell(new RespondDepartureTime(r.flightId, timeForDeparture), getSelf());
-	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} seconds for aircraft {} departure", this.airportId, timeForDeparture, r.flightId);
+	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} for aircraft {} departure", this.airportId, timeForDeparture, Parameters.timeUnit, r.flightId);
 	            	//printDepartureQueue();
 	            	if(Parameters.logAirportState) printAirportState();
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
