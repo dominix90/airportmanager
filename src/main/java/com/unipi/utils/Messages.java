@@ -348,4 +348,99 @@ public class Messages {
 		  }
 	  }
 	
+	/* ============================================================== */
+	/* ======================= ANALISI DATI ========================= */
+	/* ============================================================== */
+	public static final class NewAircraftInLandingQueue {
+		public final String flightId;
+		public NewAircraftInLandingQueue(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class NewAircraftInEmergencyQueue {
+		public final String flightId;
+		public NewAircraftInEmergencyQueue(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftRejectedLanding {
+		public final String flightId;
+		public AircraftRejectedLanding(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftTookOff {
+		public final String flightId;
+		public AircraftTookOff(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftEmergencyLanding {
+		public final String flightId;
+		public AircraftEmergencyLanding(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftLanding {
+		public final String flightId;
+		public AircraftLanding(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftTakingOff {
+		public final String flightId;
+		public AircraftTakingOff(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftNowInEmergency {
+		public final String flightId;
+		public AircraftNowInEmergency(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftRequestedDeparture {
+		public final String flightId;
+		public AircraftRequestedDeparture(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class ChangedTotalAircraftsNumber {
+		public final int change;
+		public ChangedTotalAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedEmergencyQueueAircraftsNumber {
+		public final int change;
+		public ChangedEmergencyQueueAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedLandingQueueAircraftsNumber {
+		public final int change;
+		public ChangedLandingQueueAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedDepartureQueueAircraftsNumber {
+		public final int change;
+		public ChangedDepartureQueueAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	
 }

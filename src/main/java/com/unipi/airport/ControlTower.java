@@ -14,6 +14,7 @@ public class ControlTower extends AbstractActor {
 	/* ========== VARIABILI E STRUTTURE DATI ========== */	
 	private final String airportId; //id aeroporto
 	private Runway[] runways;
+	private ActorRef analysisManager;
 	private int numberOfAircrafts;
 	private LinkedList<Aircraft> landingQueue;
 	private LinkedList<Aircraft> emergencyLandingQueue;
@@ -26,6 +27,7 @@ public class ControlTower extends AbstractActor {
 	public ControlTower(String airportId, Runway[] runways) {
 	    this.airportId = airportId;
 	    this.runways = runways;
+	    this.analysisManager = null;
 	    this.numberOfAircrafts = 0;
 	    this.landingQueue = new LinkedList<Aircraft>();
 	    this.emergencyLandingQueue = new LinkedList<Aircraft>();
@@ -41,6 +43,9 @@ public class ControlTower extends AbstractActor {
 	@Override
 	public void preStart() {
 		if(Parameters.logVerbose) log.info("ControlTower actor {} started", airportId);
+		
+		//Creo attore per l'analisi
+		if(Parameters.analysisActivated) analysisManager = getContext().actorOf(AnalysisManager.props(airportId), "analysis-manager");
 	}
 
 	@Override
@@ -165,6 +170,8 @@ public class ControlTower extends AbstractActor {
 			// La pista va settata occupata
 			runway.setAircraftInRunway(landingAircraft);
 			runway.setStatus("OCCUPIED");
+			//invio messaggio di analisi
+        	if(Parameters.analysisActivated) analysisManager.tell(new AircraftEmergencyLanding(landingAircraft.getFlightId()), getSelf());
 		} else if (landingQueue.size() > 0) {
 			Aircraft landingAircraft = landingQueue.removeFirst();
 			if(Parameters.logVerbose) log.info("Informing aircraft {} that it can start landing", landingAircraft.getFlightId());
@@ -172,6 +179,8 @@ public class ControlTower extends AbstractActor {
 			// La pista va settata occupata
 			runway.setAircraftInRunway(landingAircraft);
 			runway.setStatus("OCCUPIED");
+			//invio messaggio di analisi
+			if(Parameters.analysisActivated) analysisManager.tell(new AircraftLanding(landingAircraft.getFlightId()), getSelf());
 		} else {
 			/* Se le code di atterraggio sono vuote si controlla quella di partenza */
 			startDeparture(runway);
@@ -209,6 +218,8 @@ public class ControlTower extends AbstractActor {
 			// La pista va settata occupata
 			runway.setAircraftInRunway(departureAircraft);
 			runway.setStatus("OCCUPIED");
+			//invio messaggio di analisi
+			if(Parameters.analysisActivated) analysisManager.tell(new AircraftTakingOff(departureAircraft.getFlightId()), getSelf());
 		}
 	}
 	
@@ -455,6 +466,7 @@ public class ControlTower extends AbstractActor {
 		            	long timeForLanding = getTimeForLanding(r.flightId);
 		            	sender.tell(new RespondLandingTime(r.flightId, timeForLanding), getSelf());
 		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} for aircraft {} landing", this.airportId, timeForLanding, Parameters.timeUnit, r.flightId);
+		            	if(Parameters.analysisActivated) analysisManager.tell(new NewAircraftInLandingQueue(r.flightId), getSelf()); //invio messaggio di analisi
 		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 		            	//printRunways();
 		            	//Runway freeRunway = getFreeRunway();
@@ -476,6 +488,7 @@ public class ControlTower extends AbstractActor {
 	            	long timeForEmergencyLanding = getTimeForEmergencyLanding(r.flightId);
 	            	sender.tell(new RespondLandingTime(r.flightId, timeForEmergencyLanding), getSelf());
 	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, Parameters.timeUnit, r.flightId);
+	            	if(Parameters.analysisActivated) analysisManager.tell(new NewAircraftInEmergencyQueue(r.flightId), getSelf()); //invio messaggio di analisi
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
 	            	//printRunways();
 	            	//Runway freeRunway = getFreeRunway();
@@ -497,6 +510,7 @@ public class ControlTower extends AbstractActor {
 		            		if(Parameters.logVerbose) log.info("Aircraft {} changed course. It is now directed to another airport", r.flightId);
 		            		deleteAircraft(r.flightId);
 		            		--numberOfAircrafts;
+		            		if(Parameters.analysisActivated) analysisManager.tell(new AircraftRejectedLanding(r.flightId), getSelf()); //invio messaggio di analisi
 		            		//if(Parameters.logAirportState) printAirportState();
 		            		//printLandingQueue(); // metodo di debug
 		            	}
@@ -541,6 +555,8 @@ public class ControlTower extends AbstractActor {
 		            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} (EMERGENCY LANDING) for aircraft {} landing", this.airportId, timeForEmergencyLanding, Parameters.timeUnit, r.flightId);
 		            	
 		            	if(Parameters.logAirportState) printAirportState();
+		            	
+		            	if(Parameters.analysisActivated) analysisManager.tell(new AircraftNowInEmergency(r.flightId), getSelf()); //invio messaggio di analisi
 		            	
 		            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
 		            	//printRunways();
@@ -593,6 +609,7 @@ public class ControlTower extends AbstractActor {
 	            	if(Parameters.logVerbose) log.info("Control tower {} computed {} {} for aircraft {} departure", this.airportId, timeForDeparture, Parameters.timeUnit, r.flightId);
 	            	//printDepartureQueue();
 	            	if(Parameters.logAirportState) printAirportState();
+	            	if(Parameters.analysisActivated) analysisManager.tell(new AircraftRequestedDeparture(r.flightId), getSelf()); //invio messaggio di analisi
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
 	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
@@ -616,6 +633,7 @@ public class ControlTower extends AbstractActor {
 	            	--numberOfAircrafts;
 	            	//printParking();
 	            	if(Parameters.logAirportState) printAirportState();
+	            	if(Parameters.analysisActivated) analysisManager.tell(new AircraftTookOff(r.flightId), getSelf()); //invio messaggio di analisi
 	            	/* Aggiorno tutti gli aerei in coda sugli orari di atterraggio */
 	            	informAllAircrafts();
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */

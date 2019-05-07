@@ -7,6 +7,7 @@ import java.util.Properties;
 import java.util.Scanner;
 
 import com.unipi.airport.AirportSupervisor;
+import com.unipi.utils.Parameters;
 
 import akka.actor.ActorSystem;
 import akka.actor.ActorRef;
@@ -15,20 +16,15 @@ public class AirportMain {
 
 	private static Properties myProperties;
 	
-	public static void main(String[] args) throws IOException {
-	    ActorSystem system = ActorSystem.create("airport-system");
-	    
+	public static void main(String[] args) throws IOException, InterruptedException {
+	    ActorSystem system = ActorSystem.create("airport-system-"+Parameters.seed);
 
-	    try {
-	    	// Create top level supervisor
-	    	ActorRef supervisor = system.actorOf(AirportSupervisor.props(), "airport-supervisor");
-	    	
-	    	System.out.println("Press ENTER to exit the system");
-	    	System.out.println(new File("").getAbsolutePath());
-	    	System.in.read();
-	    	} finally {
-	    		system.terminate();
-	    }
+    	ActorRef supervisor = system.actorOf(AirportSupervisor.props(Parameters.seed), "airport-supervisor-"+Parameters.seed );
+    	
+    	Thread.sleep(Parameters.simDuration);
+    	
+    	system.terminate();
+
 	}
 	
 	private static int loadProperties() {

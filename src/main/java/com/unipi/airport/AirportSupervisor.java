@@ -6,6 +6,7 @@ import akka.event.*;
 import org.apache.commons.math3.distribution.*;
 
 import java.time.Duration;
+import java.util.LinkedList;
 
 import com.unipi.utils.Messages.*;
 import com.unipi.utils.Parameters;
@@ -19,19 +20,23 @@ public class AirportSupervisor extends AbstractActor {
 	private static final String[] ALPHA_STRING = {"EW","HV", "FR","AZ","VY"};
 	private static final String NUMERIC_STRING = "0123456789";
 	//DISTRIBUZIONI
+	private int seed;
 	private ExponentialDistribution interArrivalTimeDistribution;
 	private UniformRealDistribution fuelDistribution;
 	private UniformRealDistribution emergencyDistribution;
 	private LogNormalDistribution landingTimeDistribution;
 	private LogNormalDistribution takeOffTimeDistribution;
 	private LogNormalDistribution parkingTimeDistribution;
-
-	public static Props props() {
-		return Props.create(AirportSupervisor.class);
-	}
-	
 	//TORRE DI CONTROLLO
 	ActorRef controlTower;
+
+	/* ========== COSTRUTTORE E METODI NATIVI ========== */	
+	public AirportSupervisor(int seed) {
+	    this.seed = seed;
+	}
+	public static Props props(int seed) {
+		return Props.create(AirportSupervisor.class, () -> new AirportSupervisor(seed));
+	}
 
 	@Override
 	public void preStart() {
@@ -39,20 +44,28 @@ public class AirportSupervisor extends AbstractActor {
 		
 		//DISTRIBUZIONI
 		interArrivalTimeDistribution = new ExponentialDistribution(Parameters.meanInterArrivalTime);
-		interArrivalTimeDistribution.reseedRandomGenerator(Parameters.seed);
+		interArrivalTimeDistribution.reseedRandomGenerator(seed);
 		fuelDistribution = new UniformRealDistribution(Parameters.minFuel,Parameters.maxFuel);
-		fuelDistribution.reseedRandomGenerator(Parameters.seed);
+		fuelDistribution.reseedRandomGenerator(seed);
 		emergencyDistribution = new UniformRealDistribution(0,100);
-		emergencyDistribution.reseedRandomGenerator(Parameters.seed);
+		emergencyDistribution.reseedRandomGenerator(seed);
 		landingTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanLandingTime), Parameters.shapeLandingTime);
-		landingTimeDistribution.reseedRandomGenerator(Parameters.seed);
+		landingTimeDistribution.reseedRandomGenerator(seed);
 		takeOffTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanTakeOffTime), Parameters.shapeTakeOffTime);
-		takeOffTimeDistribution.reseedRandomGenerator(Parameters.seed+1000);
+		takeOffTimeDistribution.reseedRandomGenerator(seed+1000);
 		parkingTimeDistribution = new LogNormalDistribution(Math.log(Parameters.meanParkingTime), Parameters.shapeParkingTime);
-		parkingTimeDistribution.reseedRandomGenerator(Parameters.seed+2000);
+		parkingTimeDistribution.reseedRandomGenerator(seed+2000);
 		
+		//INIZIALIZZAZIONE PISTE E AEROPORTO
+		Runway[] runways = new Runway[Parameters.runwaysNumber];
+		for (int i = 0; i < Parameters.runwaysNumber; i++) {
+			runways[i] = new Runway(i+1, "FREE");
+		}
+	    controlTower = getContext().actorOf(ControlTower.props("CTA-"+seed,runways), "cta-"+seed);
 		
-		//AEREO INIZIALE
+		//CREAZIONE AEREO INIZIALE E SCHEDULING SELFMESSAGE PER PROSSIMO AEREO
+	    /* Viene generato il primo aereo e schedulato 
+	     * il selfmessage per la generazione del traffico di volo */
 		String flightId = generateFlightId(6);
     	
     	double nextArrival = interArrivalTimeDistribution.sample();
@@ -63,31 +76,16 @@ public class AirportSupervisor extends AbstractActor {
     	double parkingTime = parkingTimeDistribution.sample();
     	
     	ActorRef aircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(fuel), emergencyState, landingTime, takeOffTime, parkingTime), flightId.toLowerCase());
-    	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);
     	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} {}", flightId, nextArrival, Parameters.timeUnit);
-    	
-    	/* DEBUG */
-		/*
-		 * for (int i = 0; i < 10; i++) { nextArrival = getTimeForNextArrival();
-		 * log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId,
-		 * nextArrival); } getContext().stop(getSelf());
-		 */
-    	/*END DEBUG */
-		
-		//PISTE E AEROPORTO
-		Runway[] runways = new Runway[Parameters.runwaysNumber];
-		for (int i = 0; i < Parameters.runwaysNumber; i++) {
-			runways[i] = new Runway(i+1, "FREE");
-		}
-	    controlTower = getContext().actorOf(ControlTower.props("CTA",runways), "cta");
 	    
-	    /* Viene generato il primo aereo e schedulato 
-	     * il selfmessage per la generazione del traffico di volo */
 	    aircraft.tell(new StartLandingRequest(controlTower, flightId), controlTower);
+	    scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);	    
+	    
 	}
 
 	@Override
 	public void postStop() {
+		if(Parameters.logVerbose) log.info("Reached {} {}: ending simulation.", Parameters.simDuration, Parameters.timeUnit);
 		log.info("Airport Application stopped");
 	}
 
@@ -143,8 +141,8 @@ public class AirportSupervisor extends AbstractActor {
 	            	ActorRef newAircraft = getContext().actorOf(AircraftActor.props(flightId, Math.round(fuel), emergencyState, landingTime, takeOffTime, parkingTime), flightId.toLowerCase());	
 	            	newAircraft.tell(new StartLandingRequest(controlTower, flightId), controlTower);
 	            	scheduler.scheduleOnce(Duration.ofMillis(Math.round(nextArrival)), getSelf(), new AircraftGenerator(), getContext().getSystem().dispatcher(), null);	            	
-	            	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} milliseconds", flightId, nextArrival);
-	            })
+	            	if(Parameters.logVerbose) log.info("Aircraft {} generated! New aircraft in {} {}", flightId, nextArrival, Parameters.timeUnit);
+            	})
 	        .build();
 	}
 }
