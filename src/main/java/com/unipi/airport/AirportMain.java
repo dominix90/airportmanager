@@ -17,13 +17,15 @@ public class AirportMain {
 	private static Properties myProperties;
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
-	    ActorSystem system = ActorSystem.create("airport-system-"+Parameters.seed);
-
-    	ActorRef supervisor = system.actorOf(AirportSupervisor.props(Parameters.seed), "airport-supervisor-"+Parameters.seed );
-    	
-    	Thread.sleep(Parameters.simDuration);
-    	
-    	system.terminate();
+		
+		ActorSystem[] systems = new ActorSystem[Parameters.seed.length];
+		
+	    for ( int i=0; i<Parameters.seed.length; ++i ) {
+			systems[i] = ActorSystem.create("airport-system-" + Parameters.seed[i]);
+			ActorRef supervisor = systems[i].actorOf(AirportSupervisor.props(Parameters.seed[i]), "airport-supervisor-" + Parameters.seed[i]);
+			Thread.sleep(Parameters.simDuration);
+			systems[i].terminate();
+		}
 
 	}
 	

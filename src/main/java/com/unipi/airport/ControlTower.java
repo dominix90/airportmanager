@@ -147,6 +147,7 @@ public class ControlTower extends AbstractActor {
 		for( Aircraft a : emergencyParking ) {
 			if(a.getFlightId()==flightId) {
 				emergencyParking.remove(a);
+				if(Parameters.analysisActivated) analysisManager.tell(new AircraftInEmergencyLeftParking(a.getFlightId()), getSelf()); //invio messaggio di analisi
 				return;
 			}
 		}
@@ -154,6 +155,7 @@ public class ControlTower extends AbstractActor {
 		for( Aircraft a : parking ) {
 			if(a.getFlightId()==flightId) {
 				parking.remove(a);
+				if(Parameters.analysisActivated) analysisManager.tell(new AircraftLeftParking(a.getFlightId()), getSelf()); //invio messaggio di analisi
 				return;
 			}
 		}
@@ -193,9 +195,11 @@ public class ControlTower extends AbstractActor {
 		if (landedAircraft.getEmergencyState()) {
 			emergencyParking.add(landedAircraft);
 			if(Parameters.logVerbose) log.info("Aircraft {} is now parked in the emergencyParking", landedAircraft.getFlightId());	
+			if(Parameters.analysisActivated) analysisManager.tell(new AircraftInEmergencyParked(landedAircraft.getFlightId()), getSelf());//invio messaggio di analisi
 		} else {
 			parking.add(landedAircraft);
 			if(Parameters.logVerbose) log.info("Aircraft {} is now parked in the parking", landedAircraft.getFlightId());
+			if(Parameters.analysisActivated) analysisManager.tell(new AircraftParked(landedAircraft.getFlightId()), getSelf());//invio messaggio di analisi
 		}
 		
 		// La pista va settata libera	
@@ -476,6 +480,8 @@ public class ControlTower extends AbstractActor {
 	            	} else {
 	            		if(Parameters.logVerbose) log.info("The airport is full! Landing denial for aircraft {}", r.flightId);
 		            	getSender().tell(new LandingDenial(r.flightId), getSelf());
+		            	
+		            	if(Parameters.analysisActivated) analysisManager.tell(new HijackedAircraftBecauseOfAirportFull(r.flightId), getSelf()); //invio messaggio di analisi
 	            	}	       
 	            })
 	        .match(

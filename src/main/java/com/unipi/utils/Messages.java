@@ -414,6 +414,41 @@ public class Messages {
 		}
 	}
 	
+	public static final class AircraftInEmergencyLeftParking {
+		public final String flightId;
+		public AircraftInEmergencyLeftParking(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftLeftParking {
+		public final String flightId;
+		public AircraftLeftParking(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftInEmergencyParked {
+		public final String flightId;
+		public AircraftInEmergencyParked(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class AircraftParked {
+		public final String flightId;
+		public AircraftParked(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
+	public static final class HijackedAircraftBecauseOfAirportFull {
+		public final String flightId;
+		public HijackedAircraftBecauseOfAirportFull(String flightId) {
+			  this.flightId = flightId;
+		}
+	}
+	
 	public static final class ChangedTotalAircraftsNumber {
 		public final int change;
 		public ChangedTotalAircraftsNumber(int change) {
@@ -438,6 +473,52 @@ public class Messages {
 	public static final class ChangedDepartureQueueAircraftsNumber {
 		public final int change;
 		public ChangedDepartureQueueAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedEmergencyParkingAircraftsNumber {
+		public final int change;
+		public ChangedEmergencyParkingAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedParkingAircraftsNumber {
+		public final int change;
+		public ChangedParkingAircraftsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedEmergencyLandingsNumber {
+		public final int change;
+		public ChangedEmergencyLandingsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	public static final class ChangedLandingsNumber {
+		public final int change;
+		public ChangedLandingsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	public static final class ChangedTakeoffsNumber {
+		public final int change;
+		public ChangedTakeoffsNumber(int change) {
+			  this.change = change;
+		}
+	}
+	
+	public static final class ChangedHijackedAircraftsBecauseOfAirportFull {
+		public final int change;
+		public ChangedHijackedAircraftsBecauseOfAirportFull(int change) {
+			  this.change = change;
+		}
+	}
+	public static final class ChangedHijackedAircraftsBecauseOfFuelNumber {
+		public final int change;
+		public ChangedHijackedAircraftsBecauseOfFuelNumber(int change) {
 			  this.change = change;
 		}
 	}
