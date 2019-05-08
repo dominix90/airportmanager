@@ -6,7 +6,6 @@ import akka.event.*;
 import org.apache.commons.math3.distribution.*;
 
 import java.time.Duration;
-import java.util.LinkedList;
 
 import com.unipi.utils.Messages.*;
 import com.unipi.utils.Parameters;

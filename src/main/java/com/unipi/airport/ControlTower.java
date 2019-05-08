@@ -512,8 +512,7 @@ public class ControlTower extends AbstractActor {
 		            		
 		            	}
 		            	
-		            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-		            	//printRunways();
+		            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 		            	Runway freeRunway = getFreeRunway();
 		            	if (freeRunway != null) {
 		            		startLanding(freeRunway);
@@ -527,10 +526,8 @@ public class ControlTower extends AbstractActor {
 	            		if(Parameters.logVerbose) log.info("EMERGENCY LANDING for aircraft {} confirmed", r.flightId);
 	            		informLandingDepartureAircrafts();
 	            		if(Parameters.logAirportState) printAirportState();
-	            		//printEmergencyLandingQueue(); // metodo di debug
 	            	}
 	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	//printRunways();
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
@@ -579,8 +576,7 @@ public class ControlTower extends AbstractActor {
 	            	if(Parameters.logAirportState) printAirportState();
 	            	/* Aggiorno tutti gli aerei in coda sugli orari di atterraggio */
 	            	informAllAircrafts();
-	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	//printRunways();
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
@@ -600,7 +596,7 @@ public class ControlTower extends AbstractActor {
 	            	
 	            	if(Parameters.logAirportState) printAirportState();
 	            	if(Parameters.analysisActivated) analysisManager.tell(new AircraftRequestedDeparture(r.flightId), getSelf()); //invio messaggio di analisi
-	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */	            	
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */	            	
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);
@@ -625,8 +621,7 @@ public class ControlTower extends AbstractActor {
 	            	if(Parameters.analysisActivated) analysisManager.tell(new AircraftTookOff(r.flightId), getSelf()); //invio messaggio di analisi
 	            	/* Aggiorno tutti gli aerei in coda sugli orari di atterraggio */
 	            	informAllAircrafts();
-	            	/* Se almeno una pista � libera si da il via all'atterraggio al primo della coda */
-	            	//printRunways();
+	            	/* Se almeno una pista è libera si da il via all'atterraggio al primo della coda */
 	            	Runway freeRunway = getFreeRunway();
 	            	if (freeRunway != null) {
 	            		startLanding(freeRunway);

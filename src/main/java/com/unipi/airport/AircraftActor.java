@@ -79,7 +79,7 @@ public class AircraftActor extends AbstractActor {
             		previousFuelCheckTime = actualFuelCheckTime;
             		fuel = fuel - consumedFuel;
             		if (fuel <= 0) {
-            			/* Se il carburante � non positivo allora l'aereo usa il carburante d'emergenza 
+            			/* Se il carburante è non positivo allora l'aereo usa il carburante d'emergenza 
             			 * e diventa in stato di emergenza.
             			 * Il timer viene annullato.
             			 */
@@ -141,21 +141,12 @@ public class AircraftActor extends AbstractActor {
             	}
             })
         .match(
-    		UpdateLandingTime.class, //da modificare, deve essere sincrono
+    		UpdateLandingTime.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {            		
-            		//if (inEmergency) {
-            		//	getSender().tell(new EmergencyLandingConfirmation(true, flightId, 2), getSelf());
-            		//	log.info("Landing confirmed by aircraft {} after landing queue update", this.flightId);
-            		//}
-            		//else {
-            		//	boolean landingConfirmation = sufficientFuel(r.timeForLanding);
-		            //	if (!landingConfirmation) {
-		            //		getSender().tell(new LandingConfirmation(landingConfirmation, flightId, 2), getSelf());	            	
-		            //		log.info("Landing canceled by aircraft {} after landing queue update", this.flightId);
-		      		//		getContext().stop(getSelf());
-		            //	}
-            		//}
+            		/*
+            		 * Procedura di risposta all'aggiornamento dei tempi
+            		 * */
             	}
             })
         /* ========== INIZIO ATTERRAGGIO ========== */
@@ -169,7 +160,6 @@ public class AircraftActor extends AbstractActor {
             		getSender().tell(new Landing(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere alla fine dell'atterraggio */
             		long runwayOccupation = Math.round(landingTime);
-            		//System.out.print("\n\n!!!!!!" + landingTime + "!!!!!!!!\n\n");
             		scheduler.scheduleOnce(Duration.ofMillis(runwayOccupation), getSelf(), new InLandingState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
             	}
             })
@@ -181,7 +171,6 @@ public class AircraftActor extends AbstractActor {
             		r.controlTower.tell(new LandingComplete(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere quando l'aereo dovr� ripartire */
             		long parkingOccupation = Math.round(parkingTime);
-            		//System.out.print("\n\n!!!!!!" + parkingTime + "!!!!!!!!\n\n");
             		scheduler.scheduleOnce(Duration.ofMillis(parkingOccupation), getSelf(), new StartDeparturePhase(flightId, r.controlTower), getContext().getSystem().dispatcher(), null);
             	}
             })
@@ -199,14 +188,18 @@ public class AircraftActor extends AbstractActor {
     		RespondDepartureTime.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		
+            		/*
+            		 * Procedura di risposta all'aggiornamento dei tempi
+            		 * */
             	}
             })
         .match(
     		UpdateDepartureTime.class,
             r -> {
             	if (this.flightId.equals(r.flightId)) {
-            		
+            		/*
+            		 * Procedura di risposta all'aggiornamento dei tempi
+            		 * */
             	}
             })
         /* ========== INIZIO FASE DI DECOLLO ========== */
@@ -217,8 +210,7 @@ public class AircraftActor extends AbstractActor {
             		getSender().tell(new TakingOff(r.runway, r.flightId), getSelf());
             		/* Viene schedulato un messaggio da ricevere alla fine del decollo */
             		long runwayOccupation = Math.round(takeOffTime);
-            		//System.out.print("\n\n!!!!!!" + takeOffTime + "!!!!!!!!\n\n");
-	            	scheduler.scheduleOnce(Duration.ofMillis(runwayOccupation), getSelf(), new InTakeOffState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
+            		scheduler.scheduleOnce(Duration.ofMillis(runwayOccupation), getSelf(), new InTakeOffState(r.runway, flightId, getSender()), getContext().getSystem().dispatcher(), null);
             	}
             })
         /* ========== DECOLLO ========== */
